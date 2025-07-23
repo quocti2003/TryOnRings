@@ -365,10 +365,70 @@ const BackCamera = () => {
                 // }
 
 
+                // if (ringModel) {
+                //     const canvas = threeCanvasRef.current;
+
+                //     // --- POSITION (giữ nguyên) ---
+                //     const targetX = midpoint.x * canvas.width;
+                //     const targetY = midpoint.y * canvas.height;
+
+                //     const p13_px = new THREE.Vector2(landmarks[13].x * canvas.width, landmarks[13].y * canvas.height);
+                //     const p9_px = new THREE.Vector2(landmarks[9].x * canvas.width, landmarks[9].y * canvas.height);
+                //     const fingerWidthInPixels = p13_px.distanceTo(p9_px);
+
+                //     const DISTANCE_FROM_CAMERA = 5;
+                //     const fovInRadians = (camera.fov * Math.PI) / 180;
+                //     const viewHeight = 2 * Math.tan(fovInRadians / 2) * DISTANCE_FROM_CAMERA;
+
+                //     const targetScaleValue = (fingerWidthInPixels / canvas.height) * viewHeight * 0.5;
+                //     const targetScale = new THREE.Vector3(targetScaleValue, targetScaleValue, targetScaleValue);
+
+                //     const targetPosition = new THREE.Vector3(
+                //         (targetX / canvas.width - 0.5) * viewHeight * camera.aspect,
+                //         -(targetY / canvas.height - 0.5) * viewHeight,
+                //         -DISTANCE_FROM_CAMERA
+                //     );
+
+                //     // --- ROTATION FIX: PROPER COORDINATE TRANSFORMATION ---
+
+                //     // Step 1: Convert hand vectors to 2D screen space for debugging
+                //     const fX_2D = new THREE.Vector2(fX.x, fX.y).normalize();
+                //     const fY_2D = new THREE.Vector2(fY.x, fY.y).normalize();
+                //     const fZ_2D = new THREE.Vector2(fZ.x, fZ.y).normalize();
+
+                //     // Step 2: Create proper Three.js coordinate system
+                //     // The key insight: We need to map hand coordinate to ring coordinate properly 
+
+
+                //     // OPTION 3: Camera-relative coordinate (comment/uncomment to test)
+
+                //     const ringX = new THREE.Vector3(fX.x, -fX.y, fX.z); // Flip X
+                //     const ringY = new THREE.Vector3(fY.x, fY.y, fY.z);  // Flip Y  
+                //     const ringZ = new THREE.Vector3(fZ.x, fZ.y, -fZ.z);  // Flip Z
+
+
+                //     // Create rotation matrix
+                //     const rotationMatrix = new THREE.Matrix4().makeBasis(ringX, ringY, ringZ);
+                //     const targetQuaternion = new THREE.Quaternion().setFromRotationMatrix(rotationMatrix);
+
+                //     // Apply with smoothing
+                //     const SMOOTHING_FACTOR = 0.15;
+                //     ringModel.position.lerp(targetPosition, SMOOTHING_FACTOR);
+                //     ringModel.quaternion.slerp(targetQuaternion, SMOOTHING_FACTOR);
+                //     ringModel.scale.lerp(targetScale, SMOOTHING_FACTOR);
+
+                //     // DEBUG: Log để theo dõi
+                //     console.log("Hand fX:", fX.toArray());
+                //     console.log("Hand fY:", fY.toArray());
+                //     console.log("Hand fZ:", fZ.toArray());
+                //     console.log("Ring rotation euler:", ringModel.rotation);
+                // }
+
+                // FIX: COORDINATE MAPPING để nhẫn luôn vuông góc với ngón tay
                 if (ringModel) {
                     const canvas = threeCanvasRef.current;
 
-                    // --- POSITION (giữ nguyên) ---
+                    // --- POSITION & SCALE (giữ nguyên) ---
                     const targetX = midpoint.x * canvas.width;
                     const targetY = midpoint.y * canvas.height;
 
@@ -389,23 +449,32 @@ const BackCamera = () => {
                         -DISTANCE_FROM_CAMERA
                     );
 
-                    // --- ROTATION FIX: PROPER COORDINATE TRANSFORMATION ---
+                    // --- ROTATION FIX: REMAP COORDINATE ĐỂ NHẪN LUÔN VUÔNG GÓC ---
 
-                    // Step 1: Convert hand vectors to 2D screen space for debugging
-                    const fX_2D = new THREE.Vector2(fX.x, fX.y).normalize();
-                    const fY_2D = new THREE.Vector2(fY.x, fY.y).normalize();
-                    const fZ_2D = new THREE.Vector2(fZ.x, fZ.y).normalize();
+                    // VẤN ĐỀ: Pre-rotation trong modelLoader đã "dựng đứng" nhẫn
+                    // GIẢI PHÁP: Remap hand coordinate để compensate pre-rotation
 
-                    // Step 2: Create proper Three.js coordinate system
-                    // The key insight: We need to map hand coordinate to ring coordinate properly
+                    // Hand coordinate system:
+                    // fX: ngang ngón tay (finger width)
+                    // fY: dọc ngón tay (finger length) 
+                    // fZ: ra khỏi mu bàn tay (toward nail)
 
+                    // Ring coordinate system (sau pre-rotation):
+                    // ringX: ngang nhẫn (ring width)
+                    // ringY: thẳng ra khỏi mặt nhẫn (ring normal) 
+                    // ringZ: quanh chu vi nhẫn (ring circumference)
 
-                    // OPTION 3: Camera-relative coordinate (comment/uncomment to test)
+                    // MAPPING MỚI: Để nhẫn luôn vuông góc với ngón tay
+                    const ringX = new THREE.Vector3(fX.x, -fX.y, fX.z);  // fX → ringX (ngang)
+                    const ringY = new THREE.Vector3(fZ.x, fZ.y, -fZ.z);  // fZ → ringY (normal nhẫn = hướng nail)
+                    const ringZ = new THREE.Vector3(-fY.x, fY.y, fY.z);  // fY → ringZ (quanh nhẫn, có flip)
 
-                    const ringX = new THREE.Vector3(fX.x, -fX.y, fX.z); // Flip X
-                    const ringY = new THREE.Vector3(fY.x, fY.y, fY.z);  // Flip Y  
-                    const ringZ = new THREE.Vector3(fZ.x, fZ.y, -fZ.z);  // Flip Z
-
+                    // ALTERNATIVE: Nếu trên không work, thử mapping này:
+                    /*
+                    const ringX = new THREE.Vector3(fX.x, -fX.y, fX.z);  // fX → ringX  
+                    const ringY = new THREE.Vector3(-fZ.x, -fZ.y, fZ.z); // fZ → ringY (với flip khác)
+                    const ringZ = new THREE.Vector3(fY.x, fY.y, -fY.z);  // fY → ringZ (với flip khác)
+                    */
 
                     // Create rotation matrix
                     const rotationMatrix = new THREE.Matrix4().makeBasis(ringX, ringY, ringZ);
@@ -417,14 +486,19 @@ const BackCamera = () => {
                     ringModel.quaternion.slerp(targetQuaternion, SMOOTHING_FACTOR);
                     ringModel.scale.lerp(targetScale, SMOOTHING_FACTOR);
 
-                    // DEBUG: Log để theo dõi
-                    console.log("Hand fX:", fX.toArray());
-                    console.log("Hand fY:", fY.toArray());
-                    console.log("Hand fZ:", fZ.toArray());
-                    console.log("Ring rotation euler:", ringModel.rotation);
+                    // DEBUG: Tăng cường logging
+                    console.log("=== HAND COORDINATE ===");
+                    console.log("fX (finger width):", fX.toArray());
+                    console.log("fY (finger length):", fY.toArray());
+                    console.log("fZ (toward nail):", fZ.toArray());
+
+                    console.log("=== RING COORDINATE ===");
+                    console.log("ringX:", ringX.toArray());
+                    console.log("ringY:", ringY.toArray());
+                    console.log("ringZ:", ringZ.toArray());
+
+                    console.log("Ring euler:", ringModel.rotation);
                 }
-
-
 
                 // --- VẼ DEBUG 2D ---
                 const originPx = { x: midpoint.x * canvasWidth, y: midpoint.y * canvasHeight };

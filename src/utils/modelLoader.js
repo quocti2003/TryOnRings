@@ -74,7 +74,7 @@ export const modelLoader = (url) => {
                 model.rotation.y = Math.PI; // Tương đương 180 độ
                 // model.rotation.z = THREE.MathUtils.degToRad(4);
                 // model.rotation.x = THREE.MathUtils.degToRad(40);
-                model.rotation.x = THREE.MathUtils.degToRad(120); // Xoay để "dựng đứng" nhẫn dậy
+                model.rotation.x = THREE.MathUtils.degToRad(60); // Xoay để "dựng đứng" nhẫn dậy
 
                 // 4. Thêm model đã được xoay vào container
                 container.add(model);
