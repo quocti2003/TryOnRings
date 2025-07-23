@@ -11,6 +11,8 @@ import ModelViewer3 from './components/jsx/lab/ModelViewer3';
 import Simulate from './components/jsx/lab/Simulate';
 import PreprocessingViewer from './components/jsx/lab/PreprocessingViewer';
 import BackCamera from './components/jsx/lab/BackCamera';
+import AR1 from './components/jsx/lab/AR1';
+
 import './App2.css';
 
 function App() {
@@ -24,8 +26,8 @@ function App() {
             {/* <PreprocessingViewer /> */}
 
 
-
-            <BackCamera />
+            {/* {<BackCamera />} */}
+            <AR1 />
         </div>
     );
 }
