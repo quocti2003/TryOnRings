@@ -1,370 +1,576 @@
+// --- PHẦN 1: KHAI BÁO VÀ IMPORT ---
+// Import các thư viện và thành phần cần thiết từ React và các thư viện khác.
 import React, { useEffect, useRef, useState } from 'react';
+// Import các thành phần từ thư viện @mediapipe/tasks-vision để nhận diện bàn tay.
 import { HandLandmarker, FilesetResolver } from "@mediapipe/tasks-vision";
+// Import thư viện Three.js để xử lý đồ họa 3D.
 import * as THREE from 'three';
-import { modelLoader } from '../../../utils/modelLoader.js';
+// Import GLTFLoader để tải các mô hình 3D định dạng .gltf hoặc .glb.
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+// Import file CSS để định dạng giao diện cho component.
 import './BackCamera.css';
+import { modelLoader } from '../../../utils/modelLoader.js';
+import { modelLoader2 } from '../../../utils/modelLoader2.js';
 
-// --- CÁC HÀM HỖ TRỢ TÍNH TOÁN VECTOR (Không đổi) ---
-const subtract = (v1, v2) => ({ x: v1.x - v2.x, y: v1.y - v2.y, z: v1.z - v2.z });
-const crossProduct = (v1, v2) => ({ x: v1.y * v2.z - v1.z * v2.y, y: v1.z * v2.x - v1.x * v2.z, z: v1.x * v2.y - v1.y * v2.x });
-const normalize = (v) => {
-    const len = Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
-    if (len === 0) return { x: 0, y: 0, z: 0 };
-    return { x: v.x / len, y: v.y / len, z: v.z / len };
-};
-const toThreeVector = (v) => new THREE.Vector3(v.x, v.y, v.z);
-const distance = (v1, v2) => Math.sqrt(Math.pow(v1.x - v2.x, 2) + Math.pow(v1.y - v2.y, 2) + Math.pow(v1.z - v2.z, 2));
+// --- PHẦN 2: HÀM HỖ TRỢ VÀ HẰNG SỐ ---
+// (Phần này đã được xóa, không còn hàm hỗ trợ nào ở đây)
 
-// --- CÁC HẰNG SỐ CẤU HÌNH (Không đổi) ---
-const AXIS_THICKNESS = 5;
-const ORIGIN_POINT_SIZE = 6;
-const RING_INNER_DIAMETER_MM = 18.1;
-
+// --- PHẦN 3: ĐỊNH NGHĨA COMPONENT ---
+// Định nghĩa một React functional component tên là BackCamera.
 const BackCamera = () => {
-    const videoRef = useRef(null);
-    const threeCanvasRef = useRef(null);
-    const debugCanvasRef = useRef(null);
+    // --- 3.1: KHỞI TẠO REF VÀ STATE ---
+    // useRef được dùng để tham chiếu trực tiếp đến các phần tử DOM (video, canvas) mà không cần render lại component.
+    const videoRef = useRef(null);       // Ref cho thẻ <video> hiển thị luồng camera.
+    const threeCanvasRef = useRef(null);   // Ref cho canvas vẽ cảnh 3D của Three.js (chiếc nhẫn).
+    const debugCanvasRef = useRef(null);   // Ref cho canvas vẽ các thông tin gỡ lỗi (trục tọa độ).
 
-    const [loadingMessage, setLoadingMessage] = useState("Initializing...");
-    const [handDetected, setHandDetected] = useState(false);
-    const [capturedImage, setCapturedImage] = useState(null);
-    const [fingerWidth, setFingerWidth] = useState(null);
-    const [ringDiameter, setRingDiameter] = useState(null);
-    const [ringSize, setRingSize] = useState(null);
-    const [error, setError] = useState(null);
+    // useState được dùng để quản lý các trạng thái của component. Khi state thay đổi, component sẽ render lại.
+    const [loadingMessage, setLoadingMessage] = useState("Initializing..."); // Lưu và hiển thị thông báo tải.
+    const [handDetected, setHandDetected] = useState(false);                 // Trạng thái cho biết có phát hiện tay hay không.
+    const [capturedImage, setCapturedImage] = useState(null);                // Lưu trữ ảnh đã chụp dưới dạng base64.
+    const [error, setError] = useState(null);                                // Lưu trữ thông báo lỗi nếu có.
 
+    // --- 3.2: CÁC HẰNG SỐ ĐIỀU CHỈNH ---
+    // Các hằng số để tùy chỉnh giao diện của các trục tọa độ gỡ lỗi.
+    const AXIS_THICKNESS = 4;        // Độ dày của đường kẻ trục.
+    const AXIS_LENGTH = 50;          // Chiều dài của đường kẻ trục (tính bằng pixel).
+    const ARROW_LENGTH = 10;         // Chiều dài của mũi tên ở cuối mỗi trục.
+    const ARROW_ANGLE = Math.PI / 7; // Góc của mũi tên.
+    const ORIGIN_POINT_SIZE = 6;     // Kích thước của điểm gốc tọa độ.
+    const SMOOTHING_FACTOR = 0.15;
+    const BASE_RING_SCALE = 0.003;
+    // --- 3.3: APP STATE ---
+    // Sử dụng useRef để lưu trữ các đối tượng và trạng thái không cần kích hoạt re-render.
+    // Đây là cách tối ưu hiệu năng vì các giá trị này thay đổi liên tục mỗi frame.
     const appState = useRef({
-        handLandmarker: null,
-        animationFrameId: null,
-        videoStream: null,
-        scene: null,
-        camera: null,
-        renderer: null,
-        ringModel: null,
-        isInitialized: false,
-    }).current;
+        handLandmarker: null,        // Đối tượng HandLandmarker của MediaPipe sau khi được khởi tạo.
+        animationFrameId: null,      // ID của requestAnimationFrame, dùng để hủy vòng lặp animation.
+        videoStream: null,           // Luồng video từ webcam.
+        scene: new THREE.Scene(),    // Cảnh (scene) 3D của Three.js, chứa tất cả các đối tượng 3D.
+        camera: new THREE.PerspectiveCamera(50, 16 / 9, 0.1, 1000), // Camera 3D để nhìn vào scene.
+        renderer: null,              // Trình kết xuất (renderer) của Three.js để vẽ scene lên canvas.
+        ringModel: null,             // Đối tượng mô hình 3D của chiếc nhẫn sau khi được tải.
+        // Các vector 3D được tái sử dụng để tính toán, tránh việc tạo mới mỗi frame.
+        math: {
+            // vector trong khong gian 3 chieu, co huong, co do dai
+            p0: new THREE.Vector3(), // landmark 0 --> diem goc de xac dinh mat phang long ban tay --> wrist
+            p5: new THREE.Vector3(), // landmark 5 --> index finger mcp --> goc ngon tro
+            p9: new THREE.Vector3(), // landmark 9 --> middle finger mcp --> goc ngon giua
+            p13: new THREE.Vector3(), // landmark 13 --> ring finger mcp --> goc ngon deo nhan
+            p14: new THREE.Vector3(), // landmark 14 --> ring finger pip --> tren goc ngon deo nhan 1 dot
+            p17: new THREE.Vector3(), // landmark 17 --> pinky mcp --> goc ngon ut
 
-    // --- CÁC HÀM KHỞI TẠO ĐƯỢC TÁCH RIÊNG ---
+            fingerDir: new THREE.Vector3(),
+            palmDirX: new THREE.Vector3(),
+            palmDirY: new THREE.Vector3(),
+            palmNormal: new THREE.Vector3(), // vector phap tuyen cua long ban tay, chi thang ra tu long ban tay
 
-    const setupMediaPipe = async () => {
-        setLoadingMessage("Loading hand model...");
-        const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.12/wasm");
-        appState.handLandmarker = await HandLandmarker.createFromOptions(vision, {
-            baseOptions: {
-                modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`,
-                delegate: "GPU",
-            },
-            runningMode: "VIDEO",
-            numHands: 1,
-            outputWorldLandmarks: true,
-        });
-    };
 
-    const startWebcam = async () => {
-        setLoadingMessage("Starting camera...");
-        if (!navigator.mediaDevices?.getUserMedia) {
-            throw new Error("Camera not supported by this browser.");
+            fingerX: new THREE.Vector3(), // Vector này chỉ ngang qua chiều rộng của ngón tay
+            fingerY: new THREE.Vector3(), // fingerY = p14 - p13 vector chi huong cua ngon tay --> doc thieu chieu cua ngon tay 
+            fingerZ: new THREE.Vector3(), // vector nay chi thang ra tu mat tren cua ngon tay (cho co mong tay)
+
+            midPoint: new THREE.Vector3(),
+            targetScale: new THREE.Vector3(),
+
+            // Cho logic xoay
+            targetMatrix: new THREE.Matrix4(),
+            targetQuaternion: new THREE.Quaternion(),
+            autoRotationQuaternion: new THREE.Quaternion(),
+            finalRingQuaternion: new THREE.Quaternion(),
+            rotationAngle: 0,
+            standardXAxis: new THREE.Vector3(1, 0, 0),
+            standardYAxis: new THREE.Vector3(0, 1, 0),
+            standardZAxis: new THREE.Vector3(0, 0, 1),
+
         }
-        // Đây là nơi trình duyệt sẽ hiển thị hộp thoại xin quyền
-        const stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
-        });
-        appState.videoStream = stream;
-        if (videoRef.current) {
-            videoRef.current.srcObject = stream;
-            await new Promise((resolve) => {
+    }).current; // .current để truy cập trực tiếp vào giá trị của ref.
+
+    // --- PHẦN 4: useEffect ---
+    // useEffect được dùng để xử lý các "side effect" như gọi API, tương tác DOM, khởi tạo thư viện.
+    // Hook này sẽ chạy sau khi component được render lần đầu.
+    // Dependency array [capturedImage] có nghĩa là hook sẽ chạy lại khi giá trị `capturedImage` thay đổi.
+    useEffect(() => {
+        // Biến cờ để kiểm tra xem component có còn được mount hay không.
+        // Giúp ngăn ngừa lỗi khi cập nhật state trên một component đã bị unmount.
+        let isCancelled = false;
+
+        // Hàm chính để khởi tạo toàn bộ ứng dụng.
+        const initialize = async () => {
+            setError(null); // Xóa lỗi cũ trước khi bắt đầu.
+            try {
+                if (isCancelled) return; // Nếu component đã unmount, không làm gì cả.
+                await setupMediaPipe();  // Khởi tạo mô hình nhận diện tay của MediaPipe.
+                if (isCancelled) return;
+                await setupThreeScene(); // Chuẩn bị cảnh 3D với Three.js.
+                if (isCancelled) return;
+                await startWebcam();     // Mở và cấu hình camera.
+                startAnimationLoop();    // Bắt đầu vòng lặp xử lý và vẽ mỗi frame.
+            } catch (err) {
+                if (isCancelled) return;
+                console.error("Initialization failed:", err);
+                // Hiển thị lỗi cho người dùng.
+                setError(err.message || "Không thể khởi tạo. Vui lòng kiểm tra quyền camera và thử lại.");
+                setLoadingMessage(""); // Ẩn thông báo loading.
+            }
+        };
+
+        // Hàm thiết lập MediaPipe HandLandmarker.
+        const setupMediaPipe = async () => {
+            setLoadingMessage("Tải mô hình nhận diện...");
+            // Tải các file cần thiết cho MediaPipe Vision.
+            const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.12/wasm");
+            // Tạo một đối tượng HandLandmarker với các tùy chọn.
+            appState.handLandmarker = await HandLandmarker.createFromOptions(vision, {
+                baseOptions: {
+                    // Đường dẫn đến file mô hình đã được huấn luyện.
+                    modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`,
+                    // Sử dụng GPU để tăng tốc xử lý nếu có thể.
+                    delegate: "GPU",
+                },
+                runningMode: "VIDEO", // Chế độ xử lý cho luồng video liên tục.
+                numHands: 1,          // Chỉ nhận diện tối đa 1 bàn tay.
+            });
+        };
+
+        // Hàm thiết lập cảnh 3D của Three.js.
+        const setupThreeScene = async () => {
+            setLoadingMessage("Chuẩn bị không gian 3D...");
+            appState.camera.position.z = 5; // Đặt camera ở một khoảng cách để nhìn thấy scene.
+            // Thêm ánh sáng môi trường để tất cả các đối tượng đều được chiếu sáng.
+            appState.scene.add(new THREE.AmbientLight(0xffffff, 1.5));
+            // Thêm ánh sáng có hướng để tạo bóng và chiều sâu.
+            const dirLight = new THREE.DirectionalLight(0xffffff, 2);
+            dirLight.position.set(5, 5, 5);
+            appState.scene.add(dirLight);
+
+            // Tải mô hình 3D của chiếc nhẫn.
+            try {
+                setLoadingMessage("Đang tải mô hình nhẫn...");
+                // Gọi hàm modelLoader đã import
+                const ringContainer = await modelLoader('/models/demo-ring.glb');
+
+                // Lưu toàn bộ container (gồm nhẫn và các trục) vào appState
+                appState.ringModel = ringContainer;
+
+                // Mặc định ẩn container đi
+                appState.ringModel.visible = false;
+
+                // Thêm container vào cảnh 3D
+                appState.scene.add(appState.ringModel);
+            } catch (error) {
+                console.error("Không thể tải mô hình nhẫn:", error);
+                // Có thể ném lỗi ra ngoài để hàm initialize bắt được
+                throw new Error("Không thể tải mô hình nhẫn. Vui lòng kiểm tra đường dẫn và file.");
+            }
+        };
+
+        // Hàm khởi động webcam.
+        const startWebcam = async () => {
+            setLoadingMessage("Mở camera...");
+            if (!navigator.mediaDevices?.getUserMedia) throw new Error("Trình duyệt không hỗ trợ camera.");
+
+            // Yêu cầu quyền truy cập camera từ người dùng.
+            const stream = await navigator.mediaDevices.getUserMedia({
+                // Ưu tiên camera sau ('environment'), độ phân giải cao.
+                video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+            });
+            appState.videoStream = stream; // Lưu luồng video lại.
+            videoRef.current.srcObject = stream; // Gán luồng video cho thẻ <video>.
+
+            // Trả về một Promise, sẽ resolve khi video đã sẵn sàng để phát.
+            return new Promise((resolve) => {
                 videoRef.current.onloadedmetadata = () => {
-                    videoRef.current.play();
-                    resolve();
+                    videoRef.current.play(); // Phát video.
+                    // Lấy kích thước thực tế của video.
+                    const { videoWidth: vW, videoHeight: vH } = videoRef.current;
+                    // Cài đặt kích thước cho các canvas để khớp với video.
+                    threeCanvasRef.current.width = vW;
+                    threeCanvasRef.current.height = vH;
+                    debugCanvasRef.current.width = vW;
+                    debugCanvasRef.current.height = vH;
+                    // Cập nhật tỷ lệ khung hình cho camera 3D.
+                    appState.camera.aspect = vW / vH;
+                    appState.camera.updateProjectionMatrix();
+                    // Khởi tạo renderer của Three.js.
+                    appState.renderer = new THREE.WebGLRenderer({ canvas: threeCanvasRef.current, antialias: true, alpha: true });
+                    appState.renderer.setSize(vW, vH); // Đặt kích thước renderer.
+                    appState.renderer.setPixelRatio(window.devicePixelRatio); // Tối ưu cho màn hình có mật độ điểm ảnh cao.
+                    resolve(); // Báo hiệu đã xong.
                 };
             });
-        }
-    };
-
-    const setupThreeJS = () => {
-        const video = videoRef.current;
-        const canvas = threeCanvasRef.current;
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        debugCanvasRef.current.width = video.videoWidth;
-        debugCanvasRef.current.height = video.videoHeight;
-
-        appState.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-        appState.renderer.setSize(canvas.width, canvas.height);
-        appState.renderer.setPixelRatio(window.devicePixelRatio);
-        appState.renderer.outputEncoding = THREE.sRGBEncoding;
-        appState.scene = new THREE.Scene();
-
-        const verticalFovDegrees = 55;
-        const aspect = canvas.width / canvas.height;
-        appState.camera = new THREE.PerspectiveCamera(verticalFovDegrees, aspect, 0.1, 1000);
-        appState.camera.position.set(0, 0, 0);
-
-        appState.scene.add(new THREE.AmbientLight(0xffffff, 0.7));
-        const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
-        dirLight.position.set(0, 5, 5);
-        appState.scene.add(dirLight);
-
-        if (appState.ringModel) {
-            appState.scene.add(appState.ringModel);
-            appState.ringModel.visible = false;
-        }
-    };
-
-    const startDetectionLoop = () => {
-        setLoadingMessage("");
-        setError(null);
-
-        const detect = () => {
-            if (!appState.videoStream?.active) {
-                console.error("Camera stream lost.");
-                setError("Camera stream was lost. Please try again.");
-                if (appState.animationFrameId) cancelAnimationFrame(appState.animationFrameId);
-                return;
-            }
-
-            if (videoRef.current?.readyState >= 4 && appState.handLandmarker) {
-                const results = appState.handLandmarker.detectForVideo(videoRef.current, performance.now());
-                processDetections(results);
-            }
-            appState.animationFrameId = requestAnimationFrame(detect);
         };
-        detect();
-    };
 
-    // Hàm khởi tạo chính, có khả năng xử lý lỗi
-    const initialize = async () => {
-        setError(null);
-        setLoadingMessage("Initializing...");
+        // Hàm bắt đầu vòng lặp animation.
+        const startAnimationLoop = () => {
+            setLoadingMessage(""); // Xóa thông báo loading.
+            const animate = () => {
+                if (isCancelled) return; // Dừng lại nếu component đã unmount.
+                // Yêu cầu trình duyệt gọi lại hàm animate ở frame tiếp theo.
+                appState.animationFrameId = requestAnimationFrame(animate);
+                // Chỉ xử lý khi video đã tải xong và sẵn sàng.
+                if (videoRef.current?.readyState >= 4) {
+                    // Chạy nhận diện tay trên frame video hiện tại.
+                    const results = appState.handLandmarker.detectForVideo(videoRef.current, performance.now());
+                    // Gửi kết quả đến hàm xử lý.
+                    processFrame(results);
+                }
+            };
+            animate(); // Bắt đầu vòng lặp.
+        };
 
-        try {
-            if (!appState.ringModel) {
-                setLoadingMessage("Loading 3D Ring Model...");
-                const modelContainer = await modelLoader('/models/demo-ring.glb');
-                const axesGroup = modelContainer.children[1];
-                if (axesGroup) { axesGroup.visible = true; }
-                appState.ringModel = modelContainer;
+        const getWorldVector = (landmark, distance, targetVector) => {
+            // 1. Lấy FOV (Field of View - Góc nhìn) của camera và đổi sang radians
+            const fovInRadians = (appState.camera.fov * Math.PI) / 180;
+
+            // 2. Tính chiều cao của khung nhìn camera ở một khoảng cách 'distance' nhất định
+            const height = 2 * Math.tan(fovInRadians / 2) * distance;
+
+            // 3. Tính chiều rộng của khung nhìn dựa trên chiều cao và tỉ lệ khung hình (aspect ratio)
+            const width = height * appState.camera.aspect;
+
+            // 4. Đặt vị trí cuối cùng
+            targetVector.set(
+                (landmark.x - 0.5) * width,
+                -(landmark.y - 0.5) * height,
+                -distance
+            );
+        };
+
+        const processFrame = (results) => {
+            // Lấy các đối tượng cần thiết từ appState và refs.
+            const { ringModel, camera, renderer, scene } = appState;
+            const debugCtx = debugCanvasRef.current.getContext('2d');
+
+            // Bước 1: Dọn dẹp canvas cho frame mới.
+            renderer.clear();
+            debugCtx.clearRect(0, 0, debugCanvasRef.current.width, debugCanvasRef.current.height);
+
+            // Bước 2: Kiểm tra xem có tay trong kết quả không.
+            const isHandVisible = results.landmarks?.length > 0 && results.handedness?.length > 0;
+            setHandDetected(isHandVisible);
+
+            // BƯỚC 3: LOGIC HIỂN THỊ NHẪN
+            if (ringModel) {
+                // SỬA LỖI: Hiển thị nhẫn khi có tay, ẩn khi không có tay
+                ringModel.visible = isHandVisible;
             }
-            if (!appState.handLandmarker) { await setupMediaPipe(); }
-            await startWebcam();
-            if (!appState.renderer) { setupThreeJS(); }
-            startDetectionLoop();
-            appState.isInitialized = true;
-        } catch (err) {
-            console.error("Initialization failed:", err);
-            // Xử lý các loại lỗi khác nhau để đưa ra thông báo phù hợp
-            if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-                setError("Camera access was denied. Please allow camera permission in your browser settings and try again.");
-            } else {
-                setError(err.message || "Could not access camera. Please check connection and try again.");
-            }
-            setLoadingMessage("");
-        }
-    };
 
-    useEffect(() => {
-        if (!appState.isInitialized && !capturedImage) {
+            // Bước 4: Xử lý chính nếu phát hiện có tay.
+            if (isHandVisible) {
+                // --- Lấy dữ liệu ---
+                const landmarks = results.landmarks[0];
+                const hand = results.handedness[0][0].categoryName;
+                const canvasWidth = debugCanvasRef.current.width;
+                const canvasHeight = debugCanvasRef.current.height;
+
+                // --- TÍNH TOÁN HỆ TRỤC TỌA ĐỘ ---
+                const p0 = new THREE.Vector3(landmarks[0].x, landmarks[0].y, landmarks[0].z);
+                const p5 = new THREE.Vector3(landmarks[5].x, landmarks[5].y, landmarks[5].z);
+                const p12 = new THREE.Vector3(landmarks[12].x, landmarks[12].y, landmarks[12].z);
+                const p13 = new THREE.Vector3(landmarks[13].x, landmarks[13].y, landmarks[13].z);
+                const p14 = new THREE.Vector3(landmarks[14].x, landmarks[14].y, landmarks[14].z);
+                const p16 = new THREE.Vector3(landmarks[16].x, landmarks[16].y, landmarks[16].z);
+                const p17 = new THREE.Vector3(landmarks[17].x, landmarks[17].y, landmarks[17].z);
+
+                const yVec = new THREE.Vector3().subVectors(p14, p13).normalize();
+                const vec5_0 = new THREE.Vector3().subVectors(p5, p0);
+                const vec17_0 = new THREE.Vector3().subVectors(p17, p0);
+
+                let zVecPalm = new THREE.Vector3().crossVectors(vec5_0, vec17_0);
+                if (hand === 'Left') {
+                    zVecPalm.negate();
+                }
+                zVecPalm.normalize(); // zVecPalm hiện đang chỉ vào lòng bàn tay
+
+                let xVec = new THREE.Vector3().crossVectors(yVec, zVecPalm).normalize(); // xVec hiện đang chỉ sang trái
+
+                // SỬA LỖI & TINH CHỈNH TRỤC TỌA ĐỘ THEO YÊU CẦU
+                const fX = xVec.negate(); // Trục X chỉ về bên PHẢI (đúng yêu cầu)
+                const fY = yVec; // Trục Y dọc theo ngón tay
+                const fZ = zVecPalm.clone().negate(); // Trục Z hướng ra khỏi mu bàn tay (đúng yêu cầu)
+
+                // Lấy trung điểm gốc
+                const midpoint = {
+                    x: (landmarks[13].x + landmarks[14].x) / 2,
+                    y: (landmarks[13].y + landmarks[14].y) / 2,
+                    z: (landmarks[13].z + landmarks[14].z) / 2
+                };
+
+
+
+                // --- ÁP DỤNG VÀO MÔ HÌNH 3D (Bản hoàn chỉnh có smoothing) ---
+                // if (ringModel) {
+                //     // =========================================================================
+                //     // GIẢI PHÁP TỐI ƯU: TÍNH TOÁN TRONG KHÔNG GIAN MÀN HÌNH (SCREEN SPACE)
+                //     // =========================================================================
+
+                //     const canvas = threeCanvasRef.current;
+
+                //     // --- Bước 1: Tính toán Vị trí (X, Y) trên màn hình ---
+                //     // Đây là tọa độ pixel chính xác của điểm giữa trên màn hình.
+                //     const targetX = midpoint.x * canvas.width;
+                //     const targetY = midpoint.y * canvas.height;
+
+                //     // --- Bước 2: Tính toán Kích thước (Scale) trên màn hình ---
+                //     // Đo khoảng cách pixel giữa khớp ngón áp út (13) và ngón giữa (9).
+                //     const p13_px = new THREE.Vector2(landmarks[13].x * canvas.width, landmarks[13].y * canvas.height);
+                //     const p9_px = new THREE.Vector2(landmarks[9].x * canvas.width, landmarks[9].y * canvas.height);
+                //     const fingerWidthInPixels = p13_px.distanceTo(p9_px);
+
+                //     // --- Bước 3: Đặt Vị trí và Kích thước cho Nhẫn trong không gian 3D ---
+                //     // Để làm điều này, chúng ta cần biết khoảng cách từ camera đến vật thể. 
+                //     // Chúng ta sẽ giữ một khoảng cách Z cố định.
+                //     const DISTANCE_FROM_CAMERA = 5; // Bạn có thể tinh chỉnh số này
+
+                //     // Tính chiều cao của khung nhìn tại khoảng cách đó.
+                //     const fovInRadians = (camera.fov * Math.PI) / 180;
+                //     const viewHeight = 2 * Math.tan(fovInRadians / 2) * DISTANCE_FROM_CAMERA;
+
+                //     // Tính scale cần thiết để model có kích thước bằng fingerWidthInPixels.
+                //     // (Giả sử model gốc có chiều cao là 1 đơn vị)
+                //     const targetScaleValue = (fingerWidthInPixels / canvas.height) * viewHeight * 0.5;
+                //     const targetScale = new THREE.Vector3(targetScaleValue, targetScaleValue, targetScaleValue);
+
+                //     // Chuyển đổi tọa độ pixel (targetX, targetY) thành tọa độ thế giới 3D.
+                //     const targetPosition = new THREE.Vector3(
+                //         (targetX / canvas.width - 0.5) * viewHeight * camera.aspect,
+                //         -(targetY / canvas.height - 0.5) * viewHeight,
+                //         -DISTANCE_FROM_CAMERA
+                //     );
+                //     // PHẦN 2: TÍNH HỆ TRỤC TỌA ĐỘ (ROTATION) - ĐÂY LÀ PHẦN BỊ THIẾU
+                //     // Tạo ma trận xoay từ các vector cơ sở fX, fY, fZ
+                //     const rotationMatrix = new THREE.Matrix4().makeBasis(fX, fY, fZ);
+
+                //     // Chuyển ma trận xoay thành quaternion
+                //     // const handOrientation = new THREE.Quaternion().setFromRotationMatrix(rotationMatrix);
+
+                //     // Áp dụng phép xoay điều chỉnh 180 độ quanh trục X (nếu cần)
+                //     // const correctionAxis = new THREE.Vector3(1, 0, 0);
+                //     // const correctionAngle = Math.PI;
+                //     // const correctionQuaternion = new THREE.Quaternion().setFromAxisAngle(correctionAxis, correctionAngle);
+
+                //     // Kết hợp hai phép xoay
+                //     // const targetQuaternion = new THREE.Quaternion().multiplyQuaternions(handOrientation, correctionQuaternion);
+                //     const targetQuaternion = new THREE.Quaternion().setFromRotationMatrix(rotationMatrix);
+
+
+                //     // PHẦN 4: ÁP DỤNG VÀO MODEL (với smoothing)
+                //     const SMOOTHING_FACTOR = 0.15;
+                //     ringModel.position.lerp(targetPosition, SMOOTHING_FACTOR);
+                //     ringModel.quaternion.slerp(targetQuaternion, SMOOTHING_FACTOR);
+                //     ringModel.scale.lerp(targetScale, SMOOTHING_FACTOR);
+
+                //     console.log("Ring positioned at midpoint 13-14 with proper orientation");
+                // }
+
+
+                if (ringModel) {
+                    const canvas = threeCanvasRef.current;
+
+                    // --- POSITION (giữ nguyên) ---
+                    const targetX = midpoint.x * canvas.width;
+                    const targetY = midpoint.y * canvas.height;
+
+                    const p13_px = new THREE.Vector2(landmarks[13].x * canvas.width, landmarks[13].y * canvas.height);
+                    const p9_px = new THREE.Vector2(landmarks[9].x * canvas.width, landmarks[9].y * canvas.height);
+                    const fingerWidthInPixels = p13_px.distanceTo(p9_px);
+
+                    const DISTANCE_FROM_CAMERA = 5;
+                    const fovInRadians = (camera.fov * Math.PI) / 180;
+                    const viewHeight = 2 * Math.tan(fovInRadians / 2) * DISTANCE_FROM_CAMERA;
+
+                    const targetScaleValue = (fingerWidthInPixels / canvas.height) * viewHeight * 0.5;
+                    const targetScale = new THREE.Vector3(targetScaleValue, targetScaleValue, targetScaleValue);
+
+                    const targetPosition = new THREE.Vector3(
+                        (targetX / canvas.width - 0.5) * viewHeight * camera.aspect,
+                        -(targetY / canvas.height - 0.5) * viewHeight,
+                        -DISTANCE_FROM_CAMERA
+                    );
+
+                    // --- ROTATION FIX: PROPER COORDINATE TRANSFORMATION ---
+
+                    // Step 1: Convert hand vectors to 2D screen space for debugging
+                    const fX_2D = new THREE.Vector2(fX.x, fX.y).normalize();
+                    const fY_2D = new THREE.Vector2(fY.x, fY.y).normalize();
+                    const fZ_2D = new THREE.Vector2(fZ.x, fZ.y).normalize();
+
+                    // Step 2: Create proper Three.js coordinate system
+                    // The key insight: We need to map hand coordinate to ring coordinate properly
+
+
+                    // OPTION 3: Camera-relative coordinate (comment/uncomment to test)
+
+                    const ringX = new THREE.Vector3(fX.x, -fX.y, fX.z); // Flip X
+                    const ringY = new THREE.Vector3(fY.x, fY.y, fY.z);  // Flip Y  
+                    const ringZ = new THREE.Vector3(fZ.x, fZ.y, -fZ.z);  // Flip Z
+
+
+                    // Create rotation matrix
+                    const rotationMatrix = new THREE.Matrix4().makeBasis(ringX, ringY, ringZ);
+                    const targetQuaternion = new THREE.Quaternion().setFromRotationMatrix(rotationMatrix);
+
+                    // Apply with smoothing
+                    const SMOOTHING_FACTOR = 0.15;
+                    ringModel.position.lerp(targetPosition, SMOOTHING_FACTOR);
+                    ringModel.quaternion.slerp(targetQuaternion, SMOOTHING_FACTOR);
+                    ringModel.scale.lerp(targetScale, SMOOTHING_FACTOR);
+
+                    // DEBUG: Log để theo dõi
+                    console.log("Hand fX:", fX.toArray());
+                    console.log("Hand fY:", fY.toArray());
+                    console.log("Hand fZ:", fZ.toArray());
+                    console.log("Ring rotation euler:", ringModel.rotation);
+                }
+
+
+
+                // --- VẼ DEBUG 2D ---
+                const originPx = { x: midpoint.x * canvasWidth, y: midpoint.y * canvasHeight };
+                // ... (phần code vẽ debug giữ nguyên) ...
+                const AXIS_THICKNESS = 2, AXIS_LENGTH = 50, ARROW_LENGTH = 10, ARROW_ANGLE = Math.PI / 6, ORIGIN_POINT_SIZE = 5;
+                debugCtx.lineWidth = AXIS_THICKNESS;
+                debugCtx.lineCap = 'round';
+                const drawAxisWithArrow = (vec, color, label) => {
+                    const endPx = { x: originPx.x + vec.x * AXIS_LENGTH, y: originPx.y + vec.y * AXIS_LENGTH };
+                    debugCtx.strokeStyle = color;
+                    debugCtx.beginPath();
+                    debugCtx.moveTo(originPx.x, originPx.y);
+                    debugCtx.lineTo(endPx.x, endPx.y);
+                    debugCtx.stroke();
+                    const angle = Math.atan2(endPx.y - originPx.y, endPx.x - originPx.x);
+                    debugCtx.beginPath();
+                    debugCtx.moveTo(endPx.x, endPx.y);
+                    debugCtx.lineTo(endPx.x - ARROW_LENGTH * Math.cos(angle - ARROW_ANGLE), endPx.y - ARROW_LENGTH * Math.sin(angle - ARROW_ANGLE));
+                    debugCtx.stroke();
+                    debugCtx.beginPath();
+                    debugCtx.moveTo(endPx.x, endPx.y);
+                    debugCtx.lineTo(endPx.x - ARROW_LENGTH * Math.cos(angle + ARROW_ANGLE), endPx.y - ARROW_LENGTH * Math.sin(angle + ARROW_ANGLE));
+                    debugCtx.stroke();
+                    debugCtx.fillStyle = color;
+                    debugCtx.font = 'bold 16px Arial';
+                    debugCtx.fillText(label, endPx.x + vec.x * 10, endPx.y + vec.y * 10);
+                };
+                // drawAxisWithArrow(fX, 'rgb(255, 0, 0)', 'fX');
+                // drawAxisWithArrow(fY, 'rgb(0, 255, 0)', 'fY');
+                // drawAxisWithArrow(fZ, 'rgb(0, 0, 255)', 'fZ');
+                debugCtx.fillStyle = 'yellow';
+                debugCtx.beginPath();
+                debugCtx.arc(originPx.x, originPx.y, ORIGIN_POINT_SIZE, 0, 2 * Math.PI);
+                debugCtx.fill();
+            }
+
+            // Cuối cùng, yêu cầu renderer vẽ scene đã được cập nhật lên canvas 3D.
+            renderer.render(scene, camera);
+        };
+
+        // Chỉ chạy hàm khởi tạo nếu chưa có ảnh nào được chụp.
+        if (!capturedImage) {
             initialize();
         }
+
+        // Hàm dọn dẹp (cleanup function) của useEffect.
+        // Sẽ được gọi khi component bị unmount hoặc trước khi effect chạy lại.
         return () => {
-            if (appState.animationFrameId) cancelAnimationFrame(appState.animationFrameId);
+            isCancelled = true; // Đặt cờ để dừng các tiến trình bất đồng bộ.
+            if (appState.animationFrameId) {
+                // Hủy vòng lặp animation để tiết kiệm tài nguyên.
+                cancelAnimationFrame(appState.animationFrameId);
+                appState.animationFrameId = null;
+            }
             if (appState.videoStream) {
+                // Dừng luồng video và giải phóng camera.
                 appState.videoStream.getTracks().forEach(track => track.stop());
                 appState.videoStream = null;
             }
         };
-    }, [capturedImage]);
+    }, [capturedImage]); // Dependency array
 
-    // Hàm này và các hàm tính toán bên dưới không có thay đổi
-    const processDetections = (results) => {
-        const { ringModel, camera, renderer } = appState;
-        const debugCtx = debugCanvasRef.current.getContext('2d');
-
-        renderer.clear();
-        debugCtx.clearRect(0, 0, debugCanvasRef.current.width, debugCanvasRef.current.height);
-
-        const isHandVisible = results.landmarks?.length > 0 && results.handedness?.length > 0;
-        setHandDetected(isHandVisible);
-
-        if (ringModel) ringModel.visible = isHandVisible;
-
-        // Kiểm tra có đầy đủ dữ liệu cần thiết không
-        if (isHandVisible && results.worldLandmarks?.length > 0) {
-            const landmarks = results.landmarks[0]; // Tọa độ trên màn hình (để định vị và xoay)
-            const worldLandmarks = results.worldLandmarks[0]; // Tọa độ thế giới thực (để đo kích thước)
-            const hand = results.handedness[0][0].categoryName;
-            const canvasWidth = debugCanvasRef.current.width;
-            const canvasHeight = debugCanvasRef.current.height;
-
-            // --- 1. TÍNH TOÁN HỆ TRỤC TỌA ĐỘ ---
-            const yVec = normalize(subtract(landmarks[16], landmarks[13]));
-            let zVecRaw = crossProduct(subtract(landmarks[5], landmarks[0]), subtract(landmarks[17], landmarks[0]));
-            if (hand === 'Left') zVecRaw = { x: -zVecRaw.x, y: -zVecRaw.y, z: -zVecRaw.z };
-            const zVec = normalize(zVecRaw);
-            const xVec = normalize(crossProduct(yVec, zVec));
-
-            // --- 2. TÍNH TOÁN VỊ TRÍ ---
-            const midpoint = { x: (landmarks[13].x + landmarks[14].x) / 2, y: (landmarks[13].y + landmarks[14].y) / 2, z: (landmarks[13].z + landmarks[14].z) / 2 };
-            const worldPosition = new THREE.Vector3((midpoint.x - 0.5) * 2, -(midpoint.y - 0.5) * 2, 0.5).unproject(camera);
-            worldPosition.z = -(midpoint.z + 0.5) * 100;
-
-            // --- 3. TÍNH TOÁN KÍCH THƯỚC VÀ TỶ LỆ CHÍNH XÁC ---
-            const w13 = worldLandmarks[13];
-            const w14 = worldLandmarks[14];
-            const fingerWidthMeters = distance(w13, w14);
-            const fingerWidthMm = fingerWidthMeters * 1000;
-
-            const scale = fingerWidthMm / RING_INNER_DIAMETER_MM;
-
-            setFingerWidth(fingerWidthMm.toFixed(1));
-            setRingDiameter(fingerWidthMm.toFixed(1));
-            setRingSize(getRingSize(fingerWidthMm));
-
-            // --- 4. ÁP DỤNG VÀO MÔ HÌNH 3D ---
-            if (ringModel) {
-                ringModel.position.copy(worldPosition);
-                ringModel.scale.set(scale, scale, scale);
-                const rotationMatrix = new THREE.Matrix4().makeBasis(toThreeVector(xVec), toThreeVector(yVec), toThreeVector(zVec));
-                ringModel.quaternion.setFromRotationMatrix(rotationMatrix);
-            }
-
-            // --- 5. VẼ DEBUG 2D ---
-            const originPx = { x: midpoint.x * canvasWidth, y: midpoint.y * canvasHeight };
-            debugCtx.lineWidth = AXIS_THICKNESS;
-            debugCtx.lineCap = 'round';
-            const drawAxis = (vec, color) => {
-                debugCtx.strokeStyle = color;
-                debugCtx.beginPath();
-                debugCtx.moveTo(originPx.x, originPx.y);
-                // Trục tọa độ 2D không cần phải lớn, chỉ cần đủ để nhìn
-                debugCtx.lineTo(originPx.x + vec.x * 30, originPx.y + vec.y * 30);
-                debugCtx.stroke();
-            };
-            drawAxis(xVec, 'rgb(255, 0, 0)');
-            drawAxis(yVec, 'rgb(0, 255, 0)');
-            drawAxis(zVec, 'rgb(0, 0, 255)');
-
-            debugCtx.fillStyle = 'yellow';
-            debugCtx.beginPath();
-            debugCtx.arc(originPx.x, originPx.y, ORIGIN_POINT_SIZE, 0, 2 * Math.PI);
-            debugCtx.fill();
-        }
-
-        renderer.render(appState.scene, camera);
-    };
-    const getRingSize = (diameterMm) => {
-        const ringSizes = [
-            { size: 3, diameter: 14.1 }, { size: 3.5, diameter: 14.5 },
-            { size: 4, diameter: 14.9 }, { size: 4.5, diameter: 15.3 },
-            { size: 5, diameter: 15.7 }, { size: 5.5, diameter: 16.1 },
-            { size: 6, diameter: 16.5 }, { size: 6.5, diameter: 16.9 },
-            { size: 7, diameter: 17.3 }, { size: 7.5, diameter: 17.7 },
-            { size: 8, diameter: 18.1 }, { size: 8.5, diameter: 18.5 },
-            { size: 9, diameter: 18.9 }, { size: 9.5, diameter: 19.4 },
-            { size: 10, diameter: 19.8 }, { size: 10.5, diameter: 20.2 },
-            { size: 11, diameter: 20.6 }, { size: 11.5, diameter: 21.0 },
-            { size: 12, diameter: 21.4 },
-        ];
-        const closest = ringSizes.reduce((prev, curr) =>
-            Math.abs(curr.diameter - diameterMm) < Math.abs(prev.diameter - diameterMm) ? curr : prev
-        );
-        return closest.size;
-    };
-
+    // --- PHẦN 5: CÁC HÀM XỬ LÝ SỰ KIỆN ---
+    // Hàm chụp ảnh.
     const capturePhoto = () => {
         const video = videoRef.current;
         const threeCanvas = threeCanvasRef.current;
         const debugCanvas = debugCanvasRef.current;
-        if (!video || !threeCanvas || !debugCanvas || !appState.renderer) return;
+        if (!video || !threeCanvas || !debugCanvas) return;
 
-        if (appState.animationFrameId) cancelAnimationFrame(appState.animationFrameId);
-
+        // Tạo một canvas tạm thời để gộp các lớp ảnh lại với nhau.
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = video.videoWidth;
         tempCanvas.height = video.videoHeight;
         const ctx = tempCanvas.getContext('2d');
+        // Vẽ lần lượt: video nền, lớp 3D (đang trống), và lớp debug.
         ctx.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
         ctx.drawImage(threeCanvas, 0, 0, tempCanvas.width, tempCanvas.height);
+        ctx.drawImage(debugCanvas, 0, 0, tempCanvas.width, tempCanvas.height);
 
-        // Vẽ hộp thông tin đo đạc lên ảnh chụp
-        if (handDetected) {
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-            ctx.fillRect(20, 20, 250, 100);
-            ctx.fillStyle = 'white';
-            ctx.font = '20px Arial';
-            ctx.fillText(`Finger Width: ${fingerWidth ? `${fingerWidth} mm` : 'N/A'}`, 30, 50);
-            ctx.fillText(`Ring Inner Diameter: ${ringDiameter ? `${ringDiameter} mm` : 'N/A'}`, 30, 80);
-            ctx.fillText(`Ring Size (US): ${ringSize ? ringSize : 'N/A'}`, 30, 110);
-        }
-
-        const imageData = tempCanvas.toDataURL('image/png');
-        setCapturedImage(imageData);
+        // Chuyển canvas thành ảnh dạng base64 và lưu vào state.
+        setCapturedImage(tempCanvas.toDataURL('image/png'));
     };
 
-    const retakePhoto = () => {
+    // Hàm chụp lại: reset state capturedImage về null để quay lại màn hình camera.
+    const retakePhoto = () => setCapturedImage(null);
+    // Hàm xử lý nút đóng (hiện chỉ log ra console).
+    const handleClose = () => console.log("Close clicked");
+    // Hàm thử lại khi có lỗi: reset state lỗi và ảnh chụp.
+    const handleRetry = () => {
+        setError(null);
         setCapturedImage(null);
     };
-
+    // Hàm tải ảnh về máy.
     const downloadPhoto = () => {
         if (!capturedImage) return;
         const link = document.createElement('a');
-        link.download = `ring-try-on-${Date.now()}.png`;
-        link.href = capturedImage;
-        link.click();
+        link.download = `ring-try-on-${Date.now()}.png`; // Tên file tải về.
+        link.href = capturedImage; // Đường dẫn là dữ liệu base64 của ảnh.
+        link.click(); // Giả lập một cú click để trình duyệt bắt đầu tải.
     };
 
-    const handleClose = () => {
-        // Thêm logic để đóng component, ví dụ: gọi một hàm từ props
-    };
-    const handleRetry = () => { initialize(); };
-
+    // --- PHẦN 6: RENDER GIAO DIỆN JSX ---
     return (
         <div className="mirror-container">
+            {/* Vùng hiển thị camera hoặc ảnh đã chụp */}
             <div className="camera-feed">
+                {/* Dựa vào state `capturedImage` để hiển thị video hoặc ảnh */}
                 {!capturedImage ? (
                     <>
+                        {/* Các phần tử hiển thị khi đang ở chế độ camera */}
                         <video ref={videoRef} className="camera-video" autoPlay playsInline muted />
                         <canvas ref={threeCanvasRef} className="detection-canvas" />
-                        <canvas ref={debugCanvasRef} className="detection-canvas" />
+                        <canvas ref={debugCanvasRef} className="detection-canvas" style={{ pointerEvents: 'none' }} />
                     </>
                 ) : (
+                    // Hiển thị ảnh đã chụp
                     <img src={capturedImage} alt="Captured" className="captured-image" />
                 )}
             </div>
 
+            {/* Lớp giao diện người dùng (UI) nằm đè lên trên */}
             <div className="ui-overlay">
                 <header className="mirror-header">
                     <button onClick={handleClose} className="close-button" aria-label="Close">×</button>
                     <h1 className="mirror-title">MIRROR</h1>
                 </header>
                 <main className="mirror-main">
-                    {!capturedImage && (<div className="scanner-frame"><div className="scanner-frame-bottom-corners" /></div>)}
-
+                    {/* Hướng dẫn người dùng, sẽ ẩn đi khi có điều kiện khác xảy ra */}
                     <p className={`instruction-text ${handDetected || loadingMessage || capturedImage || error ? 'instruction-text--hidden' : ''}`}>
                         Position your hand to start
                     </p>
-
-                    {handDetected && !capturedImage && (
-                        <div className="measurements-box">
-                            <p>Finger Width: {fingerWidth ? `${fingerWidth} mm` : 'Calculating...'}</p>
-                            <p>Ring Inner Diameter: {ringDiameter ? `${ringDiameter} mm` : 'Calculating...'}</p>
-                            <p>Ring Size (US): {ringSize ? ringSize : 'Calculating...'}</p>
-                        </div>
-                    )}
                 </main>
                 <footer className="mirror-footer">
-                    {/* Giao diện xử lý lỗi chuyên nghiệp */}
+                    {/* Hiển thị thông báo lỗi và nút thử lại */}
                     {error && !capturedImage && (
                         <div className="error-container">
                             <p className="error-text">{error}</p>
                             <button onClick={handleRetry} className="action-button">Try Again</button>
                         </div>
                     )}
-
+                    {/* Hiển thị nút chụp ảnh */}
                     {!error && !capturedImage && (
                         <button onClick={capturePhoto} className="capture-button" aria-label="Capture photo" />
                     )}
-
+                    {/* Hiển thị các nút sau khi đã chụp ảnh */}
                     {capturedImage && (
                         <div className="action-buttons-container">
                             <button onClick={retakePhoto} className="action-button">Retake</button>
@@ -373,7 +579,7 @@ const BackCamera = () => {
                     )}
                 </footer>
             </div>
-
+            {/* Lớp phủ hiển thị thông báo loading */}
             {loadingMessage && (
                 <div className="loading-overlay">
                     <p className="loading-text">{loadingMessage}</p>

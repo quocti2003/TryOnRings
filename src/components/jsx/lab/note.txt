@@ -1,0 +1,29 @@
+// PHẦN 2: TÍNH HỆ TRỤC TỌA ĐỘ (ROTATION) - ĐÂY LÀ PHẦN BỊ THIẾU
+                    // Tạo ma trận xoay từ các vector cơ sở fX, fY, fZ
+                    const rotationMatrix = new THREE.Matrix4().makeBasis(fX, fY, fZ);
+
+                    // Chuyển ma trận xoay thành quaternion
+                    const handOrientation = new THREE.Quaternion().setFromRotationMatrix(rotationMatrix);
+
+                    // Áp dụng phép xoay điều chỉnh 180 độ quanh trục X (nếu cần)
+                    const correctionAxis = new THREE.Vector3(1, 0, 0);
+                    const correctionAngle = Math.PI; // 180 độ
+                    const correctionQuaternion = new THREE.Quaternion().setFromAxisAngle(correctionAxis, correctionAngle);
+
+                    // Kết hợp hai phép xoay
+                    const targetQuaternion = new THREE.Quaternion().multiplyQuaternions(handOrientation, correctionQuaternion);
+
+                    // PHẦN 3: TÍNH KÍCH THƯỚC (SCALE)
+                    const knuckleSpacing = new THREE.Vector3().subVectors(p16, p12).length();
+                    const fingerWidth = knuckleSpacing * 0.4;
+                    const ringInnerDiameter = fingerWidth * 1.05;
+                    const targetScaleValue = ringInnerDiameter;
+                    const targetScale = new THREE.Vector3(targetScaleValue, targetScaleValue, targetScaleValue);
+
+                    // PHẦN 4: ÁP DỤNG VÀO MODEL (với smoothing)
+                    const SMOOTHING_FACTOR = 0.15;
+                    ringModel.position.lerp(targetPosition, SMOOTHING_FACTOR);
+                    ringModel.quaternion.slerp(targetQuaternion, SMOOTHING_FACTOR); // ← PHẦN NÀY BỊ COMMENT
+                    ringModel.scale.lerp(targetScale, SMOOTHING_FACTOR);           // ← PHẦN NÀY BỊ COMMENT
+
+                    console.log("Ring positioned at midpoint 13-14 with proper orientation");

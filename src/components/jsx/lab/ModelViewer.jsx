@@ -120,11 +120,11 @@ const ModelViewer = () => {
 
                 // 1. ÁP DỤNG GÓC XOAY HIỆU CHỈNH VÀO CHÍNH MODEL
                 // Đây là bước "dựng vuông gốc" chiếc nhẫn lên ngón áp út.
-                const correctionYAngleRad = THREE.MathUtils.degToRad(180);
-                ringModel.rotation.y = correctionYAngleRad;
+                // const correctionYAngleRad = THREE.MathUtils.degToRad(180);
+                // ringModel.rotation.y = correctionYAngleRad;
 
-                const correctionXAngleRad = THREE.MathUtils.degToRad(140);
-                ringModel.rotation.x = correctionXAngleRad;
+                // const correctionXAngleRad = THREE.MathUtils.degToRad(140);
+                // ringModel.rotation.x = correctionXAngleRad;
 
 
                 // 2. THÊM MODEL ĐÃ ĐƯỢC HIỆU CHỈNH VÀO CONTAINER

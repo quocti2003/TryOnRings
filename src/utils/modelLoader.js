@@ -72,14 +72,16 @@ export const modelLoader = (url) => {
                 // 3. Áp dụng góc xoay "hiệu chỉnh" để đưa model về hướng mong muốn
                 // Logic này giống hệt trong ModelViewer.jsx cũ
                 model.rotation.y = Math.PI; // Tương đương 180 độ
-                model.rotation.x = THREE.MathUtils.degToRad(150); // Xoay để "dựng đứng" nhẫn dậy
+                // model.rotation.z = THREE.MathUtils.degToRad(4);
+                // model.rotation.x = THREE.MathUtils.degToRad(40);
+                model.rotation.x = THREE.MathUtils.degToRad(120); // Xoay để "dựng đứng" nhẫn dậy
 
                 // 4. Thêm model đã được xoay vào container
                 container.add(model);
 
                 // 5. Tạo và thêm các trục tọa độ cục bộ vào container
-                const modelAxes = createLabeledAxes(2, RING_AXES_CONFIG, 2);
-                container.add(modelAxes);
+                // const modelAxes = createLabeledAxes(2, RING_AXES_CONFIG, 2);
+                // container.add(modelAxes);
 
                 // 6. Bật tính năng đổ bóng
                 model.traverse((child) => {
@@ -88,7 +90,11 @@ export const modelLoader = (url) => {
                         child.receiveShadow = true;
                     }
                 });
+                const boxHelper = new THREE.Box3Helper(new THREE.Box3().setFromObject(container), 0xffffff);
+                container.add(boxHelper);
 
+                const containerAxes = createLabeledAxes(2, RING_AXES_CONFIG, 2);
+                container.add(containerAxes);
                 // Tải thành công, trả về container đã "đóng gói" hoàn chỉnh
                 resolve(container);
             },

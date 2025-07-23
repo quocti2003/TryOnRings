@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { modelLoader } from '../../../utils/modelLoader.js';
+import { modelLoader2 } from '../../../utils/modelLoader2.js';
+
 import './PreprocessingViewer.css';
 
 const PreprocessingViewer = () => {
@@ -59,7 +61,7 @@ const PreprocessingViewer = () => {
         // --- BƯỚC 2: TẢI MÔ HÌNH ---
         const loadModelAndStart = async () => {
             try {
-                const model = await modelLoader('/models/demo-ring.glb');
+                const model = await modelLoader('/models/preprocess.glb');
                 appState.ringModel = model;
                 scene.add(model);
                 setLoadingMessage("");
@@ -76,7 +78,7 @@ const PreprocessingViewer = () => {
             // THAY ĐỔI: Thay vì tự động xoay, chúng ta sẽ đặt góc xoay
             // dựa trên giá trị từ state (thông qua ref để có giá trị mới nhất).
             if (appState.ringModel) {
-                appState.ringModel.rotation.z += 0.002; // Xóa dòng xoay tự động
+                // appState.ringModel.rotation.x += 0.002; // Xóa dòng xoay tự động
                 // appState.ringModel.rotation.x = rotationRef.current.x;
                 // appState.ringModel.rotation.y = rotationRef.current.y;
                 // appState.ringModel.rotation.z = rotationRef.current.z;
