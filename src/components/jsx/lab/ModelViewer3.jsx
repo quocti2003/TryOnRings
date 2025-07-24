@@ -10,6 +10,7 @@ import { RingEnhancer } from '../../../utils/RingEnhancer.js';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { SilverRingEnhancer } from '../../../utils/SilverRingEnhancer.js';
 
 // --- CSS styles for buttons ---
 const buttonContainerStyle = {
@@ -85,7 +86,8 @@ const ModelViewer3 = () => {
         // === 3. WORKFLOW TẢI VÀ LÀM ĐẸP NHẪN ===
         const initScene = async () => {
             try {
-                const enhancer = new RingEnhancer(renderer);
+                // const enhancer = new RingEnhancer(renderer);
+                const enhancer = new SilverRingEnhancer(renderer);
                 await enhancer.init('/hdr/photo_studio_01_4k.hdr');
                 enhancer.applyEnvironment(scene);
 

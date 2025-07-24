@@ -14,29 +14,26 @@ import BackCamera from './components/jsx/lab/BackCamera';
 
 import AR1 from './components/jsx/lab/AR1';
 import AR2 from './components/jsx/lab/AR2';
+import Refined from './components/jsx/lab/Refined';
+
 
 import './App2.css';
 
 function App() {
-    const [uploadedModel, setUploadedModel] = useState(null);
-
-    const handleModelUpload = (modelUrl, modelName) => {
-        setUploadedModel({ url: modelUrl, name: modelName });
-    };
-
     return (
         <div className="App">
             {/* <Simulate /> */}
             {/* <ModelViewer1 /> */}
             {/* <ModelViewer2 /> */}
-            <ModelViewer3 />
+            {/* <ModelViewer3 /> */}
 
             {/* <PreprocessingViewer /> */}
 
             {/* {<BackCamera />} */}
             {/* <AR1 /> */}
             {/* <AR2 /> */}
-
+            <Refined />
+            {/* <RingViewer /> */}
 
 
         </div>

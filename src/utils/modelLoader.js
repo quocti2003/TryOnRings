@@ -89,16 +89,16 @@ export const modelLoader = (url) => {
                         child.castShadow = true;
                         child.receiveShadow = true;
 
-                        child.material.transparent = false;
-                        child.material.depthTest = true;
-                        child.material.depthWrite = true;
-                        child.material.colorWrite = true;
-                        child.material.blending = THREE.NoBlending;
-                        child.renderOrder = 1;
+                        // child.material.transparent = false;
+                        // child.material.depthTest = true;
+                        // child.material.depthWrite = true;
+                        // child.material.colorWrite = true;
+                        // child.material.blending = THREE.NoBlending;
+                        // child.renderOrder = 1;
                     }
                 });
                 const boxHelper = new THREE.Box3Helper(new THREE.Box3().setFromObject(container), 0xffffff);
-                // container.add(boxHelper);
+                container.add(boxHelper);
 
                 const containerAxes = createLabeledAxes(2, RING_AXES_CONFIG, 2);
                 // container.add(containerAxes);
