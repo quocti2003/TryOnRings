@@ -227,7 +227,7 @@ const AR1 = () => {
 
             // Cập nhật trạng thái hiển thị của tất cả các đối tượng 3D
             if (ringModel) ringModel.visible = isHandVisible;
-            if (fingerOccluder) fingerOccluder.visible = isHandVisible;
+            if (fingerOccluder) fingerOccluder.visible = false;
             if (debugArrow) debugArrow.visible = isHandVisible;
 
             if (isHandVisible) {

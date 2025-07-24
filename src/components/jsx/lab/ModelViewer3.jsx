@@ -1,185 +1,184 @@
-// src/components/jsx/lab/ModelViewer3.jsx
+// src/components/jsx/lab/ModelViewer3.jsx (Phiên bản "HOÀN MỸ" hoàn chỉnh)
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import * as THREE from 'three';
-import GUI from 'lil-gui';
-import { modelLoader2 } from '../../../utils/modelLoader2.js'; // Sử dụng loader đã chuẩn hóa
-import { modelLoader } from '../../../utils/modelLoader.js'; // Sử dụng loader đã chuẩn hóa
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { modelLoader } from '../../../utils/modelLoader.js';
+import { RingEnhancer } from '../../../utils/RingEnhancer.js';
 
+// --- NHẬP CÁC MODULE HẬU KỲ ---
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 
-// --- HÀM HELPER CHO TRỤC TỌA ĐỘ THẾ GIỚI ---
-// (Giữ nguyên, không thay đổi so với ModelViewer2)
-const WORLD_AXES_CONFIG = [
-    { dir: new THREE.Vector3(1, 0, 0), color: '#ff0000', text: 'X' },
-    { dir: new THREE.Vector3(0, 1, 0), color: '#00ff00', text: 'Y' },
-    { dir: new THREE.Vector3(0, 0, 1), color: '#0000ff', text: 'Z' }
-];
+// --- CSS styles for buttons ---
+const buttonContainerStyle = {
+    position: 'absolute',
+    top: '20px',
+    left: '20px',
+    zIndex: 100,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '10px',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    padding: '10px',
+    borderRadius: '8px',
+};
 
-const createLabeledAxes = (length, axesConfig, lineWidth = 2) => {
-    const axesGroup = new THREE.Group();
-    const createLabel = (text, color, position) => {
-        const canvas = document.createElement('canvas');
-        const size = 128;
-        canvas.width = size;
-        canvas.height = size;
-        const context = canvas.getContext('2d');
-        context.fillStyle = color;
-        context.font = `bold ${size * 0.7}px Arial`;
-        context.textAlign = 'center';
-        context.textBaseline = 'middle';
-        context.fillText(text, size / 2, size / 2);
-        const texture = new THREE.CanvasTexture(canvas);
-        const spriteMaterial = new THREE.SpriteMaterial({ map: texture, transparent: true });
-        const sprite = new THREE.Sprite(spriteMaterial);
-        sprite.scale.set(0.5, 0.5, 1.0);
-        sprite.position.copy(position);
-        return sprite;
-    };
-    axesConfig.forEach(axis => {
-        const material = new THREE.LineBasicMaterial({ color: axis.color, linewidth: lineWidth });
-        const points = [new THREE.Vector3(0, 0, 0), axis.dir.clone().multiplyScalar(length)];
-        const geometry = new THREE.BufferGeometry().setFromPoints(points);
-        const line = new THREE.Line(geometry, material);
-        const labelPosition = points[1].clone().multiplyScalar(1.2);
-        const label = createLabel(axis.text, axis.color, labelPosition);
-        axesGroup.add(line);
-        axesGroup.add(label);
-    });
-    return axesGroup;
+const buttonStyle = {
+    padding: '10px 18px',
+    border: '1px solid #555',
+    borderRadius: '5px',
+    cursor: 'pointer',
+    backgroundColor: '#333',
+    color: 'white',
+    fontSize: '14px',
+    textAlign: 'center',
+    transition: 'background-color 0.2s',
 };
 
 
 const ModelViewer3 = () => {
     const mountRef = useRef(null);
+    const [enhancerInstance, setEnhancerInstance] = useState(null);
 
     useEffect(() => {
         const currentMount = mountRef.current;
         if (!currentMount) return;
 
-        // === SETUP SCENE, CAMERA, RENDERER, LIGHTS (Tương tự ModelViewer2) ===
+        // === 1. THIẾT LẬP SCENE CƠ BẢN ===
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x1a1a1a);
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        scene.background = new THREE.Color(0x101010); // Nền đen sâu hơn
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
         renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.0;
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
         currentMount.appendChild(renderer.domElement);
 
-        const camera = new THREE.PerspectiveCamera(75, currentMount.clientWidth / currentMount.clientHeight, 0.1, 1000);
-        camera.position.set(0, 2, 8);
-        camera.lookAt(0, 0, 0);
+        const camera = new THREE.PerspectiveCamera(45, currentMount.clientWidth / currentMount.clientHeight, 0.1, 1000);
+        camera.position.set(0, 0, 6);
 
-        const ambientLight = new THREE.AmbientLight(0xdddddd, 0.9);
-        scene.add(ambientLight);
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.autoRotate = true;
+        controls.autoRotateSpeed = 0.5;
+        controls.minDistance = 2;
+        controls.maxDistance = 10;
 
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
-        directionalLight.position.set(5, 10, 7.5);
-        directionalLight.castShadow = true;
-        directionalLight.shadow.mapSize.width = 1024;
-        directionalLight.shadow.mapSize.height = 1024;
-        scene.add(directionalLight);
+        // === 2. THIẾT LẬP HẬU KỲ (POST-PROCESSING) ===
+        const composer = new EffectComposer(renderer);
+        const renderPass = new RenderPass(scene, camera);
+        composer.addPass(renderPass);
 
-        const worldAxes = createLabeledAxes(5, WORLD_AXES_CONFIG, 4);
-        // scene.add(worldAxes); // Thêm trục thế giới để dễ so sánh
+        const bloomPass = new UnrealBloomPass(
+            new THREE.Vector2(window.innerWidth, window.innerHeight),
+            0.6, // strength: Cường độ hào quang
+            0.1, // radius: Bán kính quầng sáng
+            0.85 // threshold: Chỉ những gì sáng hơn 85% mới phát sáng
+        );
+        composer.addPass(bloomPass);
 
-        const planeGeometry = new THREE.PlaneGeometry(20, 20);
-        const planeMaterial = new THREE.ShadowMaterial({ opacity: 0.3 });
-        const plane = new THREE.Mesh(planeGeometry, planeMaterial);
-        plane.rotation.x = -Math.PI / 2;
-        plane.position.y = -2;
-        plane.receiveShadow = true;
-        scene.add(plane);
 
-        // === MOUSE CONTROLS (Tương tự ModelViewer2) ===
-        let isDragging = false;
-        let previousMousePosition = { x: 0, y: 0 };
-        const spherical = new THREE.Spherical();
-        spherical.setFromVector3(camera.position);
-        const onMouseDown = (event) => { isDragging = true; previousMousePosition = { x: event.clientX, y: event.clientY }; };
-        const onMouseMove = (event) => { if (!isDragging) return; const deltaMove = { x: event.clientX - previousMousePosition.x, y: event.clientY - previousMousePosition.y }; spherical.theta -= deltaMove.x * 0.007; spherical.phi -= deltaMove.y * 0.007; spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, spherical.phi)); camera.position.setFromSpherical(spherical); camera.lookAt(0, 0, 0); previousMousePosition = { x: event.clientX, y: event.clientY }; };
-        const onMouseUp = () => { isDragging = false; };
-        const onMouseWheel = (event) => { event.preventDefault(); const zoomSpeed = 0.005; spherical.radius += event.deltaY * zoomSpeed; spherical.radius = Math.max(1, Math.min(20, spherical.radius)); camera.position.setFromSpherical(spherical); camera.lookAt(0, 0, 0); };
-        currentMount.addEventListener('mousedown', onMouseDown);
-        currentMount.addEventListener('mousemove', onMouseMove);
-        currentMount.addEventListener('mouseup', onMouseUp);
-        currentMount.addEventListener('mouseleave', onMouseUp);
-        currentMount.addEventListener('wheel', onMouseWheel);
-
-        const gui = new GUI();
-        gui.title("KHÔNG DÙNG - Chỉ để xem animation");
-
-        // Biến để chứa container sau khi tải xong
-        let autoRotatingContainer = null;
-
-        // === LUỒNG TẢI MODEL CHÍNH ---
-        const init = async () => {
+        // === 3. WORKFLOW TẢI VÀ LÀM ĐẸP NHẪN ===
+        const initScene = async () => {
             try {
-                const modelContainer = await modelLoader('/models/demo-ring.glb');
-                scene.add(modelContainer);
+                const enhancer = new RingEnhancer(renderer);
+                await enhancer.init('/hdr/photo_studio_01_4k.hdr');
+                enhancer.applyEnvironment(scene);
 
-                // Gán container đã tải vào biến để vòng lặp animate có thể truy cập
-                autoRotatingContainer = modelContainer;
+                const rawModel = await modelLoader('/models/demo-ring.glb');
+                const beautifulRing = enhancer.enhance(rawModel);
 
-                console.log('Model container loaded. Auto-rotation will start.');
+                scene.add(beautifulRing);
+                setEnhancerInstance(enhancer);
             } catch (error) {
-                console.error('Failed to initialize the model scene:', error);
+                console.error('Không thể khởi tạo scene:', error);
             }
         };
+        initScene();
 
-        init();
-
-        // === RESIZE & ANIMATION & CLEANUP ===
-        const handleResize = () => { const width = currentMount.clientWidth; const height = currentMount.clientHeight; camera.aspect = width / height; camera.updateProjectionMatrix(); renderer.setSize(width, height); };
-        window.addEventListener('resize', handleResize);
-
-        let frameId = null;
-        const clock = new THREE.Clock(); // Sử dụng Clock để animation mượt hơn
-
+        // === 4. ANIMATION VÀ DỌN DẸP ===
+        let animationFrameId = null;
         const animate = () => {
-            frameId = requestAnimationFrame(animate);
-
-            // --- THAY ĐỔI CHÍNH LÀ Ở ĐÂY ---
-            // Kiểm tra xem container đã được tải và gán vào biến chưa
-            if (autoRotatingContainer) {
-                // Lấy thời gian đã trôi qua để animation không phụ thuộc vào framerate
-                const elapsedTime = clock.getElapsedTime();
-
-                // Tự động xoay CONTAINER (đối tượng Cha)
-                // Cả nhẫn, trục cục bộ và hộp bao sẽ xoay theo
-                // autoRotatingContainer.rotation.x = elapsedTime * 0.5; // Xoay quanh trục Y
-                // autoRotatingContainer.rotation.y = elapsedTime * 0.5; // Xoay quanh trục Y
-
-                // autoRotatingContainer.rotation.z = elapsedTime * 0.5; // Xoay quanh trục Y
-
-                // autoRotatingContainer.rotation.x = Math.sin(elapsedTime * 0.7) * 0.2; // Thêm chút lắc lư trên trục X
-            }
-
-            renderer.render(scene, camera);
+            animationFrameId = requestAnimationFrame(animate);
+            controls.update();
+            composer.render();
         };
-
         animate();
 
+        const handleResize = () => {
+            const width = currentMount.clientWidth;
+            const height = currentMount.clientHeight;
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+            composer.setSize(width, height);
+        };
+        window.addEventListener('resize', handleResize);
+
         return () => {
-            // Dọn dẹp
-            gui.destroy();
-            cancelAnimationFrame(frameId);
+            cancelAnimationFrame(animationFrameId);
             window.removeEventListener('resize', handleResize);
-            currentMount.removeEventListener('mousedown', onMouseDown);
-            currentMount.removeEventListener('mousemove', onMouseMove);
-            currentMount.removeEventListener('mouseup', onMouseUp);
-            currentMount.removeEventListener('mouseleave', onMouseUp);
-            currentMount.removeEventListener('wheel', onMouseWheel);
-            if (currentMount && renderer.domElement) { currentMount.removeChild(renderer.domElement); }
-            scene.traverse((child) => { if (child.isMesh) { child.geometry.dispose(); if (child.material?.dispose) { child.material.dispose(); } } });
+            if (currentMount.contains(renderer.domElement)) {
+                currentMount.removeChild(renderer.domElement);
+            }
+            controls.dispose();
             renderer.dispose();
+            composer.dispose(); // Dọn dẹp cả composer
+            scene.traverse(object => {
+                if (object.geometry) object.geometry.dispose();
+                if (object.material) {
+                    if (Array.isArray(object.material)) {
+                        object.material.forEach(material => material.dispose());
+                    } else {
+                        object.material.dispose();
+                    }
+                }
+            });
         };
     }, []);
 
     return (
-        <div
-            ref={mountRef}
-            style={{ width: '100vw', height: '100vh', cursor: 'grab' }}
-        />
+        <div style={{ position: 'relative', width: '100vw', height: '100vh' }}>
+            <div style={buttonContainerStyle}>
+                <button
+                    style={buttonStyle}
+                    onMouseOver={(e) => e.target.style.backgroundColor = '#555'}
+                    onMouseOut={(e) => e.target.style.backgroundColor = '#333'}
+                    onClick={() => enhancerInstance?.setRoseGold()}
+                >
+                    Vàng Hồng
+                </button>
+                <button
+                    style={buttonStyle}
+                    onMouseOver={(e) => e.target.style.backgroundColor = '#555'}
+                    onMouseOut={(e) => e.target.style.backgroundColor = '#333'}
+                    onClick={() => enhancerInstance?.setGold()}
+                >
+                    Vàng
+                </button>
+                <button
+                    style={buttonStyle}
+                    onMouseOver={(e) => e.target.style.backgroundColor = '#555'}
+                    onMouseOut={(e) => e.target.style.backgroundColor = '#333'}
+                    onClick={() => enhancerInstance?.setSilver()}
+                >
+                    Bạc
+                </button>
+                <button
+                    style={buttonStyle}
+                    onMouseOver={(e) => e.target.style.backgroundColor = '#555'}
+                    onMouseOut={(e) => e.target.style.backgroundColor = '#333'}
+                    onClick={() => enhancerInstance?.setPlatinum()}
+                >
+                    Bạch kim
+                </button>
+            </div>
+            <div ref={mountRef} style={{ width: '100%', height: '100%', cursor: 'grab' }} />
+        </div>
     );
 };
 

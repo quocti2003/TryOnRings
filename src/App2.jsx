@@ -1,7 +1,7 @@
 // src/App.jsx
 // PHIÊN BẢN TỐI GIẢN ĐỂ KIỂM TRA
 
-import React from 'react';
+import React, { useState } from 'react';
 import CustomAxesViewer from './components/jsx/lab/CustomAxesViewer';
 import LabContainer from './components/jsx/lab/LabContainer';
 import ModelViewer from './components/jsx/lab/ModelViewer';
@@ -15,24 +15,30 @@ import BackCamera from './components/jsx/lab/BackCamera';
 import AR1 from './components/jsx/lab/AR1';
 import AR2 from './components/jsx/lab/AR2';
 
-
-
 import './App2.css';
 
 function App() {
+    const [uploadedModel, setUploadedModel] = useState(null);
+
+    const handleModelUpload = (modelUrl, modelName) => {
+        setUploadedModel({ url: modelUrl, name: modelName });
+    };
+
     return (
         <div className="App">
             {/* <Simulate /> */}
             {/* <ModelViewer1 /> */}
             {/* <ModelViewer2 /> */}
-            {/* <ModelViewer3 /> */}
+            <ModelViewer3 />
 
             {/* <PreprocessingViewer /> */}
 
-
             {/* {<BackCamera />} */}
             {/* <AR1 /> */}
-            <AR2 />
+            {/* <AR2 /> */}
+
+
+
         </div>
     );
 }
