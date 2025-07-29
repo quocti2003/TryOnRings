@@ -1,0 +1,287 @@
+/* src/components/jsx/lab/CameraScene.css */
+
+/* ---------------------------------- */
+/* --- 1. CẤU TRÚC LAYOUT CHÍNH --- */
+/* ---------------------------------- */
+.mirror-container {
+    position: fixed;
+    inset: 0;
+    background-color: #000;
+    color: white;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    overflow: hidden;
+}
+
+/* ------------------------------------------ */
+/* --- 2. LỚP NỀN (CAMERA/ẢNH) --- */
+/* ------------------------------------------ */
+.camera-feed {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.captured-image {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Style chung cho tất cả các lớp chồng lên nhau */
+.camera-video,
+.three-canvas,
+.debug-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    /* Quan trọng: Giữ cho các lớp đồng bộ, không bị méo */
+}
+
+/* Đặt thứ tự hiển thị (z-index) cho từng lớp */
+.camera-video {
+    z-index: 1;
+}
+
+.three-canvas {
+    z-index: 2;
+    pointer-events: none;
+}
+
+/* Lớp 3D (nhẫn) */
+.debug-canvas {
+    z-index: 3;
+    pointer-events: none;
+}
+
+/* Lớp 2D (chữ, chấm màu) */
+
+/* ----------------------------------------- */
+/* --- 3. LỚP GIAO DIỆN (UI OVERLAY) --- */
+/* ----------------------------------------- */
+.ui-overlay {
+    position: relative;
+    z-index: 10;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: env(safe-area-inset-top, 15px) env(safe-area-inset-right, 20px) env(safe-area-inset-bottom, 15px) env(safe-area-inset-left, 20px);
+    pointer-events: none;
+}
+
+.ui-overlay>* {
+    pointer-events: auto;
+}
+
+.mirror-footer>* {
+    pointer-events: auto;
+}
+
+/* Các phần còn lại của CSS giữ nguyên như file bạn cung cấp */
+.mirror-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    height: 60px;
+}
+
+.close-button {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 2.5rem;
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    padding: 0 10px;
+}
+
+.mirror-title {
+    font-family: 'Times New Roman', Times, serif;
+    font-weight: 400;
+    font-size: 1.2rem;
+    letter-spacing: 0.4em;
+    text-transform: uppercase;
+}
+
+.instruction-text {
+    font-size: 0.9rem;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+    text-align: center;
+}
+
+.focus-frame {
+    position: absolute;
+    top: 40%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 90vmin;
+    height: 90vmin;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    pointer-events: none;
+}
+
+.focus-corner {
+    position: absolute;
+    width: 30px;
+    height: 30px;
+}
+
+.focus-corner.top-left {
+    top: 0;
+    left: 0;
+    border-top: 5px solid rgba(255, 255, 255, 0.9);
+    border-left: 5px solid rgba(255, 255, 255, 0.9);
+}
+
+.focus-corner.top-right {
+    top: 0;
+    right: 0;
+    border-top: 5px solid rgba(255, 255, 255, 0.9);
+    border-right: 5px solid rgba(255, 255, 255, 0.9);
+}
+
+.focus-corner.bottom-left {
+    bottom: 0;
+    left: 0;
+    border-bottom: 5px solid rgba(255, 255, 255, 0.9);
+    border-left: 5px solid rgba(255, 255, 255, 0.9);
+}
+
+.focus-corner.bottom-right {
+    bottom: 0;
+    right: 0;
+    border-bottom: 5px solid rgba(255, 255, 255, 0.9);
+    border-right: 5px solid rgba(255, 255, 255, 0.9);
+}
+
+.mirror-footer {
+    height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.capture-button,
+.action-buttons-container,
+.error-container {
+    position: absolute;
+    bottom: 5%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.capture-button {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background-color: white;
+    border: 4px solid #e0e0e0;
+    cursor: pointer;
+    transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.capture-button:active {
+    transform: translateX(-50%) scale(0.9);
+}
+
+.action-buttons-container {
+    gap: 20px;
+}
+
+.action-button {
+    padding: 12px 24px;
+    border-radius: 25px;
+    border: 2px solid white;
+    background: transparent;
+    color: white;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.action-button:hover {
+    background: white;
+    color: #333;
+}
+
+.action-button:active {
+    transform: scale(0.95);
+}
+
+.finger-select-container {
+    position: absolute;
+    bottom: calc(env(safe-area-inset-bottom, 15px) + 15px);
+    right: env(safe-area-inset-right, 20px);
+    z-index: 15;
+    pointer-events: auto;
+}
+
+.finger-select {
+    background-color: rgba(0, 0, 0, 0.5);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 8px;
+    padding: 10px 15px;
+    font-size: 1rem;
+    cursor: pointer;
+    backdrop-filter: blur(5px);
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.finger-select:focus {
+    outline: 2px solid deepskyblue;
+}
+
+.loading-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    backdrop-filter: blur(5px);
+}
+
+.loading-text {
+    font-size: 1rem;
+    color: #f0f0f0;
+}
+
+.error-container {
+    flex-direction: column;
+    gap: 15px;
+}
+
+.error-text {
+    color: white;
+    font-size: 1rem;
+    text-align: center;
+    max-width: 300px;
+    padding: 15px;
+    background-color: rgba(255, 0, 0, 0.3);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 0, 0, 0.5);
+    backdrop-filter: blur(3px);
+}

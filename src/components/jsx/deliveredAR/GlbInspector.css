@@ -1,0 +1,99 @@
+/* GlbRealismInspector.css (Đã sửa lỗi cuộn chuột) */
+
+.realism-inspector-container {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    max-width: 1200px;
+    margin: 2rem auto;
+    padding: 1.5rem;
+    background-color: #f4f6f8;
+    color: #333;
+    border-radius: 12px;
+}
+
+.realism-inspector-header {
+    text-align: center;
+    border-bottom: 1px solid #d1d9e6;
+    padding-bottom: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.realism-inspector-header h1 {
+    margin: 0;
+    color: #2c3e50;
+}
+
+.realism-inspector-header p {
+    color: #7f8c8d;
+}
+
+.upload-area {
+    border: 2px dashed #3498db;
+    border-radius: 8px;
+    padding: 2rem;
+    text-align: center;
+    cursor: pointer;
+    background-color: #ecf0f1;
+    transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+}
+
+.upload-area:hover {
+    background-color: #eaf2f8;
+    border-color: #2980b9;
+}
+
+.status-message {
+    text-align: center;
+    margin: 1.5rem 0;
+    font-size: 1.1rem;
+    font-weight: 500;
+}
+
+.status-message.error {
+    color: #e74c3c;
+}
+
+.results-container h2 {
+    text-align: center;
+    margin-bottom: 2rem;
+    color: #2c3e50;
+}
+
+.results-container h2 strong {
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+    word-break: break-all;
+    color: #34495e;
+}
+
+.data-section {
+    margin-bottom: 2rem;
+}
+
+.data-section h3 {
+    font-size: 1.4rem;
+    color: #2980b9;
+    border-bottom: 2px solid #bdc3c7;
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+/* --- PHẦN SỬA LỖI QUAN TRỌNG NHẤT NẰM Ở ĐÂY --- */
+.json-viewer {
+    background-color: #ffffff;
+    border: 1px solid #d1d9e6;
+    border-radius: 6px;
+    padding: 1rem;
+    font-size: 14px;
+    line-height: 1.6;
+    text-align: left;
+    white-space: pre-wrap;
+    word-break: break-all;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+
+    /* Đặt chiều cao tối đa cho hộp chứa JSON */
+    max-height: 60vh;
+    /* Có thể dùng 60vh (60% chiều cao màn hình) hoặc 500px, 600px... */
+
+    /* Bật thanh cuộn theo chiều dọc KHI CẦN THIẾT */
+    overflow-y: auto;
+}

@@ -105,7 +105,7 @@ const ModelViewer = () => {
         gltfLoader.setDRACOLoader(dracoLoader);
 
         gltfLoader.load(
-            '/models/demo-ring.glb',
+            '/models/nhanDario.glb',
             (gltf) => {
                 const ringModel = gltf.scene;
                 container = new THREE.Group();

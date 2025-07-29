@@ -91,7 +91,7 @@ const ModelViewer3 = () => {
                 await enhancer.init('/hdr/photo_studio_01_4k.hdr');
                 enhancer.applyEnvironment(scene);
 
-                const rawModel = await modelLoader('/models/demo-ring.glb');
+                const rawModel = await modelLoader('/models/ring1.glb');
                 const beautifulRing = enhancer.enhance(rawModel);
 
                 scene.add(beautifulRing);

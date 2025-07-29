@@ -1,0 +1,50 @@
+.ring-selector-container {
+    width: 100%;
+    padding: 10px;
+    background-color: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(5px);
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.selector-title {
+    text-align: center;
+    margin: 0 0 10px 0;
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.8);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+.ring-list {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    overflow-x: auto; /* Cho phép cuộn ngang nếu có nhiều nhẫn */
+    padding-bottom: 5px;
+}
+
+.ring-item {
+    cursor: pointer;
+    border: 2px solid transparent;
+    border-radius: 50%;
+    padding: 3px;
+    transition: all 0.2s ease;
+    flex-shrink: 0; /* Ngăn các item bị co lại */
+}
+
+.ring-item img {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    object-fit: cover;
+    display: block;
+}
+
+.ring-item:hover {
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+.ring-item.selected {
+    border-color: #fff;
+    transform: scale(1.1);
+}

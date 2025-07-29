@@ -107,7 +107,7 @@ const AR1 = () => {
 
             try {
                 setLoadingMessage("Đang tải mô hình nhẫn...");
-                const ringContainer = await modelLoader('/models/demo-ring.glb');
+                const ringContainer = await modelLoader('/models/nhanDario.glb');
                 appState.ringModel = ringContainer;
                 appState.ringModel.visible = false;
 

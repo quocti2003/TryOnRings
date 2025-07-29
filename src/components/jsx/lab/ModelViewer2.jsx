@@ -4,6 +4,8 @@ import GUI from 'lil-gui';
 // --- THAY ĐỔI: Chỉ cần nhập một hàm duy nhất từ utility ---
 import { modelLoader } from '../../../utils/modelLoader.js'; // Giả sử file nằm trong src/utils/
 import { modelLoader2 } from '../../../utils/modelLoader2.js'; // Giả sử file nằm trong src/utils/
+import { modelLoader3 } from '../../../utils/modelLoader3.js'; // Giả sử file nằm trong src/utils/
+
 
 
 // --- CẤU HÌNH VÀ HÀM HELPER CHO SCENE ---
@@ -142,7 +144,7 @@ const ModelViewer2 = () => {
         const init = async () => {
             try {
                 // 1. Gọi `modelLoader` và nhận về container đã được chuẩn bị sẵn
-                const modelContainer = await modelLoader('/models/demo-ring.glb');
+                const modelContainer = await modelLoader('/models/nhanDario.glb');
 
                 // 2. Chỉ cần thêm container này vào scene là xong
                 scene.add(modelContainer);

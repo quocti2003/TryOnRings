@@ -114,7 +114,7 @@ const Refined = () => {
 
             try {
                 setLoadingMessage("Đang tải mô hình nhẫn...");
-                const ringContainer = await modelLoader('/models/demo-ring.glb');
+                const ringContainer = await modelLoader('/models/nhanDario.glb');
 
                 setLoadingMessage("Làm đẹp mô hình...");
 
@@ -238,7 +238,7 @@ const Refined = () => {
                     ringModel.position.lerp(targetPosition, SMOOTHING_FACTOR);
                     ringModel.scale.lerp(targetScale, SMOOTHING_FACTOR);
                     // Giữ rotation mặc định hoặc đặt rotation cố định
-                    ringModel.rotation.set(Math.PI / 3, 0, 0);
+                    // ringModel.rotation.set(Math.PI / 3, 0, 0);
                 }
             }
 
