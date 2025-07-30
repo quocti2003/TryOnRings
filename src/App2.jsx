@@ -24,12 +24,7 @@ import TryOnRing from './components/jsx/deliveredAR/TryOnRing';
 import GlbInspector from './components/jsx/deliveredAR/GlbInspector';
 import GlbOptimizer from './components/jsx/deliveredAR/GlbOptimizer';
 
-
-
-
-
-import './App2.css';
-
+import './App2.css'; 
 function App() {
     return (
         <div className="App">
