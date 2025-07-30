@@ -1,0 +1,343 @@
+/* src/components/jsx/lab/CameraScene.css (phiên bản cải tiến) */
+
+/* ---------------------------------- */
+/* --- 1. CẤU TRÚC LAYOUT CHÍNH --- */
+/* ---------------------------------- */
+.mirror-container {
+    position: fixed;
+    /* `inset: 0;` là cách viết gọn cho top, right, bottom, left = 0 */
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    /* Hỗ trợ cho các thiết bị có "tai thỏ" hoặc "cằm" */
+    height: 100dvh;
+    /* dvh là đơn vị chiều cao viewport động, tốt hơn cho mobile */
+    background-color: #000;
+    color: white;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    overflow: hidden;
+    /* Ngăn cuộn trang */
+}
+
+/* ------------------------------------------ */
+/* --- 2. LỚP NỀN (CAMERA/ẢNH) --- */
+/* ------------------------------------------ */
+.camera-feed {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Style chung cho tất cả các lớp chồng lên nhau */
+.captured-image,
+.camera-video,
+.three-canvas,
+.debug-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    /* Quan trọng: Lấp đầy màn hình mà không làm méo hình */
+}
+
+/* Đặt thứ tự hiển thị (z-index) cho từng lớp */
+.camera-video {
+    z-index: 1;
+}
+
+.three-canvas {
+    z-index: 2;
+    pointer-events: none;
+}
+
+.debug-canvas {
+    z-index: 3;
+    pointer-events: none;
+}
+
+/* ----------------------------------------- */
+/* --- 3. LỚP GIAO DIỆN (UI OVERLAY) --- */
+/* ----------------------------------------- */
+.ui-overlay {
+    position: relative;
+    z-index: 10;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    /* SỬA ĐỔI: Sử dụng padding với biến CSS và `env(safe-area-inset-...)` 
+       để tương thích tốt hơn với các thiết bị có tai thỏ/notch.
+    */
+    --safe-top: env(safe-area-inset-top, 15px);
+    --safe-right: env(safe-area-inset-right, 20px);
+    --safe-bottom: env(safe-area-inset-bottom, 15px);
+    --safe-left: env(safe-area-inset-left, 20px);
+    padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
+    box-sizing: border-box;
+    /* Đảm bảo padding không làm thay đổi kích thước tổng */
+    pointer-events: none;
+}
+
+.ui-overlay>* {
+    pointer-events: auto;
+}
+
+/* --- Header --- */
+.mirror-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    height: 50px;
+    flex-shrink: 0;
+}
+
+.mirror-logo {
+    height: 18px;
+    /* Chiều cao của logo. Bạn có thể điều chỉnh giá trị này */
+    width: auto;
+    /* Chiều rộng sẽ tự động điều chỉnh để giữ đúng tỷ lệ */
+    /* Không cần các thuộc tính text như font-family, letter-spacing nữa */
+}
+
+.close-button {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 2rem;
+    /* SỬA ĐỔI: Giảm kích thước nút close */
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    padding: 5px 15px;
+    /* SỬA ĐỔI: Tăng vùng có thể click */
+    -webkit-tap-highlight-color: transparent;
+    /* Loại bỏ highlight khi chạm trên mobile */
+}
+
+.mirror-title {
+    font-family: 'Times New Roman', Times, serif;
+    font-weight: 400;
+    font-size: 1rem;
+    /* SỬA ĐỔI: Kích thước chữ vừa phải */
+    text-transform: uppercase;
+    /* 
+      CHỈNH KHOẢNG CÁCH CHỮ Ở ĐÂY:
+      - `letter-spacing`: Thuộc tính này điều khiển khoảng cách giữa các ký tự.
+      - 0.4em là khá lớn. Hãy thử giảm nó xuống.
+      - 0.1em: Giãn vừa phải.
+      - 0em hoặc normal: Bình thường.
+    */
+    letter-spacing: 0.1em;
+    /* SỬA ĐỔI: Giảm đáng kể khoảng cách chữ */
+}
+
+/* --- Vùng trung tâm và Hướng dẫn --- */
+.focus-frame {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 85vw;
+    /* SỬA ĐỔI: Dùng vw để khung co giãn theo chiều rộng màn hình */
+    height: 85vw;
+    /* Giữ tỷ lệ vuông */
+    max-width: 400px;
+    /* Đặt giới hạn max để không quá to trên tablet/desktop */
+    max-height: 400px;
+    display: flex;
+    flex-direction: column;
+    /* SỬA ĐỔI: Xếp chồng text lên trên */
+    justify-content: flex-end;
+    /* Đẩy text xuống dưới đáy khung */
+    align-items: center;
+    pointer-events: none;
+    padding-bottom: 20px;
+    /* Tạo khoảng cách cho text */
+}
+
+.instruction-text {
+    font-size: 0.85rem;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+    text-align: center;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 8px 16px;
+    border-radius: 20px;
+}
+
+.focus-corner {
+    position: absolute;
+    width: 25px;
+    /* SỬA ĐỔI: Giảm kích thước góc */
+    height: 25px;
+    border-color: rgba(255, 255, 255, 0.85);
+    border-style: solid;
+    border-width: 4px;
+    /* SỬA ĐỔI: Độ dày viền */
+}
+
+.focus-corner.top-left {
+    top: 0;
+    left: 0;
+    border-right: none;
+    border-bottom: none;
+}
+
+.focus-corner.top-right {
+    top: 0;
+    right: 0;
+    border-left: none;
+    border-bottom: none;
+}
+
+.focus-corner.bottom-left {
+    bottom: 0;
+    left: 0;
+    border-right: none;
+    border-top: none;
+}
+
+.focus-corner.bottom-right {
+    bottom: 0;
+    right: 0;
+    border-left: none;
+    border-top: none;
+}
+
+/* --- Footer và các nút hành động --- */
+.mirror-footer {
+    height: 15vh;
+    /* SỬA ĐỔI: Dùng vh để footer linh hoạt hơn */
+    min-height: 100px;
+    max-height: 140px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    /* SỬA ĐỔI: Làm gốc cho các nút con */
+    flex-shrink: 0;
+    /* Ngăn footer bị co lại */
+}
+
+/* SỬA ĐỔI: Bỏ position: absolute để các nút nằm trong footer một cách tự nhiên */
+.capture-button,
+.action-buttons-container,
+.error-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.capture-button {
+    width: 65px;
+    /* SỬA ĐỔI: Kích thước nút chụp lớn hơn */
+    height: 65px;
+    border-radius: 50%;
+    background-color: white;
+    border: 5px solid rgba(255, 255, 255, 0.5);
+    cursor: pointer;
+    transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    -webkit-tap-highlight-color: transparent;
+}
+
+.capture-button:active {
+    transform: scale(0.92);
+}
+
+.action-buttons-container {
+    gap: 15px;
+    /* SỬA ĐỔI: Giảm khoảng cách giữa các nút */
+}
+
+.action-button {
+    padding: 10px 20px;
+    /* SỬA ĐỔI: Padding nhỏ hơn một chút */
+    border-radius: 25px;
+    border: 1.5px solid white;
+    /* SỬA ĐỔI: Viền mỏng hơn */
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(5px);
+    color: white;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.action-button:hover,
+.action-button:active {
+    background: white;
+    color: #333;
+}
+
+/* --- Dropdown chọn ngón tay --- */
+.finger-select-container {
+    position: absolute;
+    /* SỬA ĐỔI: Đặt ở góc trên bên phải, bên cạnh nút close */
+    bottom: var(--safe-bottom);
+    right: var(--safe-right);
+    margin-right: 2%;
+    margin-bottom: 15vh;
+    /* Đẩy xuống dưới header */
+    z-index: 15;
+    pointer-events: auto;
+}
+
+.finger-select {
+    background-color: rgba(0, 0, 0, 0.5);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    backdrop-filter: blur(5px);
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.finger-select:focus {
+    outline: 2px solid deepskyblue;
+}
+
+/* --- Lớp phủ (Loading & Error) --- */
+.loading-overlay,
+.error-container {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    flex-direction: column;
+    /* SỬA ĐỔI: Để xếp chồng các item */
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    backdrop-filter: blur(5px);
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+.loading-text,
+.error-text {
+    font-size: 1rem;
+    color: #f0f0f0;
+    text-align: center;
+}
+
+.error-text {
+    max-width: 300px;
+    padding: 15px;
+    background-color: rgba(255, 0, 0, 0.3);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 0, 0, 0.5);
+    margin-bottom: 20px;
+    /* Tạo khoảng cách với nút "Thử lại" */
+}

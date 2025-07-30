@@ -18,6 +18,8 @@ import Refined2 from './components/jsx/lab/Refined2';
 import CameraScene from './components/jsx/deliveredAR/CameraScene';
 import CameraScene1 from './components/jsx/deliveredAR/CameraScene1';
 import CameraScene2 from './components/jsx/deliveredAR/CameraScene2';
+import TryOnRing from './components/jsx/deliveredAR/TryOnRing';
+
 
 import GlbInspector from './components/jsx/deliveredAR/GlbInspector';
 import GlbOptimizer from './components/jsx/deliveredAR/GlbOptimizer';
@@ -43,8 +45,10 @@ function App() {
             {/* <GlbInspector /> */}
             {/* <GlbOptimizer /> */}
             {/* <CameraScene /> */}
-            <CameraScene1 />
+            {/* <CameraScene1 /> */}
             {/* <CameraScene2 /> */}
+            <TryOnRing />
+
 
 
         </div>
